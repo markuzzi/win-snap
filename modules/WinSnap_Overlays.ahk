@@ -1,15 +1,6 @@
 ; =========================
 ; Snap-Area Overlays
 ; =========================
-OverlayCreateEdge(color, x, y, w, h) {
-    global SnapOverlay
-    g := Gui("+AlwaysOnTop -Caption +ToolWindow +E0x20")
-    g.BackColor := color
-    g.Move(x, y, w, h)
-    g.Show("NA")
-    SnapOverlay.edges.Push(g)
-}
-
 OverlayClear() {
     global SnapOverlay
     if !SnapOverlay.HasOwnProp("edges")
@@ -21,12 +12,18 @@ OverlayClear() {
 }
 
 OverlayAddRect(rect, color, thickness := 0) {
-    global BorderPx
-    px := thickness ? thickness : Max(2, BorderPx)
-    OverlayCreateEdge(color, rect.L-1, rect.T-1, rect.R-rect.L+2, px)
-    OverlayCreateEdge(color, rect.L-1, rect.B-1, rect.R-rect.L+2, px)
-    OverlayCreateEdge(color, rect.L-1, rect.T-1, px, rect.B-rect.T+2)
-    OverlayCreateEdge(color, rect.R-1, rect.T-1, px, rect.B-rect.T+2)
+    global SnapOverlay, OverlayOpacity
+    x := Round(rect.L)
+    y := Round(rect.T)
+    w := Max(1, Round(rect.R - rect.L))
+    h := Max(1, Round(rect.B - rect.T))
+    g := Gui("+AlwaysOnTop -Caption +ToolWindow +E0x20 -DPIScale")
+    g.BackColor := color
+    g.Move(x, y, w, h)
+    g.Show("NA")
+    opacity := OverlayOpacity ? OverlayOpacity : 150
+    try WinSetTransparent(opacity, g)
+    SnapOverlay.edges.Push(g)
 }
 
 ShowRectOverlay(rectArray, color, duration := 0) {

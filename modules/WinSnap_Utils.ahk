@@ -33,7 +33,16 @@ GetMonitorIndexAndArea(hwnd) {
 }
 
 GetMonitorWork(mon) {
-    MonitorGetWorkArea(mon, &L, &T, &R, &B)
+    count := MonitorGetCount()
+    if (count <= 0)
+        count := 1
+    if (mon < 1 || mon > count)
+        mon := 1
+    try {
+        MonitorGetWorkArea(mon, &L, &T, &R, &B)
+    } catch {
+        MonitorGetWorkArea(1, &L, &T, &R, &B)
+    }
     return { left:L, top:T, right:R, bottom:B }
 }
 

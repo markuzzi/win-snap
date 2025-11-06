@@ -207,6 +207,7 @@ AdjustBoundaryForActive(whichArrow) {
     Layouts[mon].nodes[parent] := p
 
     ReapplySubtree(mon, parent)
+    Layout_SaveAll()
 }
 
 SwitchSnapArea(dir) {

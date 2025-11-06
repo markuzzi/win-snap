@@ -8,6 +8,7 @@ Layout_Ensure(mon) {
     nodes := Map()
     nodes[1] := { id:1, parent:0, split:"", frac:0.5, a:0, b:0 }  ; root unsplittet
     Layouts[mon] := { root:1, next:2, nodes:nodes }
+    Layout_SaveAll()
 }
 
 Layout_Node(mon, id) {
@@ -35,6 +36,7 @@ Layout_SplitLeaf(mon, leafId, orient) {
     n.split := (orient = "v") ? "v" : "h"
     n.frac  := 0.5
     n.a := idA, n.b := idB
+    Layout_SaveAll()
 }
 
 ; Rechteck für einen Node berechnen
@@ -170,6 +172,7 @@ Layout_RemoveLeaf(mon, leafId) {
     nodes.Delete(parentId)
     nodes[siblingId] := sibling
     Layouts[mon].nodes := nodes
+    Layout_SaveAll()
     return siblingId
 }
 
@@ -269,3 +272,91 @@ ReapplySubtree(mon, nodeId) {
         }
     }
 }
+
+; =========================
+; Layout Persistence
+; =========================
+Layout_SaveAll() {
+    global Layouts
+    path := Layout_GetStoragePath()
+    data := Layout_SerializeAll()
+    try {
+        file := FileOpen(path, "w", "UTF-8")
+        if file {
+            file.Write(JsonDump(data, 2))
+            file.Close()
+        }
+    } catch {
+        ; ignore persistence errors
+    }
+}
+
+Layout_LoadAll() {
+    global Layouts
+    path := Layout_GetStoragePath()
+    if !FileExist(path)
+        return
+    try text := FileRead(path, "UTF-8")
+    catch
+        return
+    try data := JsonLoad(text)
+    catch
+        return
+    newLayouts := Map()
+    for mon, layout in data {
+        monIdx := Layout_ToInt(mon, 1)
+        nodes := Map()
+        if layout.HasOwnProp("nodes") {
+            for id, node in layout.nodes {
+                nid := Layout_ToInt(id, 1)
+                nodes[nid] := {
+                    id: nid,
+                    parent: Layout_ToInt(node.HasOwnProp("parent") ? node.parent : 0, 0),
+                    split: node.HasOwnProp("split") ? node.split : "",
+                    frac: node.HasOwnProp("frac") ? node.frac : 0.5,
+                    a: Layout_ToInt(node.HasOwnProp("a") ? node.a : 0, 0),
+                    b: Layout_ToInt(node.HasOwnProp("b") ? node.b : 0, 0)
+                }
+            }
+        }
+        newLayouts[monIdx] := {
+            root: Layout_ToInt(layout.HasOwnProp("root") ? layout.root : 1, 1),
+            next: Layout_ToInt(layout.HasOwnProp("next") ? layout.next : (nodes.Count+1), nodes.Count+1),
+            nodes: nodes
+        }
+    }
+    if (newLayouts.Count)
+        Layouts := newLayouts
+}
+
+Layout_SerializeAll() {
+    global Layouts
+    data := {}
+    for mon, layout in Layouts {
+        nodes := {}
+        for id, node in layout.nodes {
+            nodes[id] := {
+                parent: node.parent,
+                split: node.split,
+                frac: node.frac,
+                a: node.a,
+                b: node.b
+            }
+        }
+        data[mon] := { root:layout.root, next:layout.next, nodes:nodes }
+    }
+    return data
+}
+
+Layout_ToInt(value, default := 0) {
+    try
+        return Integer(value)
+    catch
+        return default
+}
+
+Layout_GetStoragePath() {
+    return A_ScriptDir "\WinSnap_layouts.json"
+}
+
+Layout_LoadAll()

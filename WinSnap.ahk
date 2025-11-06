@@ -38,6 +38,7 @@ global SnapOverlay := {edges:[]}
 global OverlayDuration := 1200
 global SelectionFlashDuration := 350
 global OverlayColor := "Navy"
+global OverlayOpacity := 160
 global SelectionFlashColor := "Teal"
 global WindowSearch := {gui:"", edit:"", list:"", items:[], filtered:[], ctx:{}, active:false}
 
