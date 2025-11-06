@@ -49,7 +49,8 @@ global WindowSearch := {gui:"", edit:"", list:"", items:[], filtered:[], ctx:{},
 #Include ".\modules\WinSnap_Overlays.ahk"
 #Include ".\modules\WinSnap_WindowSearch.ahk"
 #Include ".\modules\WinSnap_Layout.ahk"
-#Include ".\modules\WinSnap_Leafs.ahk"
+#Include ".\modules\WinSnap_LeafWindows.ahk"
+#Include ".\modules\WinSnap_Selection.ahk"
 #Include ".\modules\WinSnap_Grid.ahk"
 
 ; =========================
