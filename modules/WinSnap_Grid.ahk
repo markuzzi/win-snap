@@ -99,26 +99,22 @@ PickLeafForUnsapped(mon, dir, cx, cy) {
 
     bestId := cands[1].id
     if (dir = "left") {
-        global MAX_X := 1_000_000_000
-        bestX := MAX_X
+        bestX := 10**9
         for o in cands
             if (o.r.L < bestX)
                 bestX := o.r.L, bestId := o.id
     } else if (dir = "right") {
-        global MIN_X := -1_000_000_000
-        bestX := MIN_X
+        bestX := -10**9
         for o in cands
             if (o.r.R > bestX)
                 bestX := o.r.R, bestId := o.id
     } else if (dir = "up") {
-        global MAX_Y := 1_000_000_000
-        bestY := MAX_Y
+        bestY := 10**9
         for o in cands
             if (o.r.T < bestY)
                 bestY := o.r.T, bestId := o.id
     } else if (dir = "down") {
-        global MIN_Y := -1_000_000_000
-        bestY := MIN_Y
+        bestY := -10**9
         for o in cands
             if (o.r.B > bestY)
                 bestY := o.r.B, bestId := o.id

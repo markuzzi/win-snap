@@ -179,13 +179,11 @@ WindowSearch_CompareTitle(a, b, *) {
 }
 
 ArraySort(arr, compareFn) {
-    arr := arr.Clone()
-    n := arr.Length
-    if (n < 2)
-        return arr
-    arr := arr.Clone()
-    arr.Sort(compareFn)
-    return arr
+    if (arr.Length < 2)
+        return arr.Clone()
+    sorted := arr.Clone()
+    sorted.Sort(compareFn)
+    return sorted
 }
 
 WindowSearch_ItemTitle(item) {

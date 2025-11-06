@@ -112,6 +112,8 @@ LeafHasWindows(mon, leafId) {
 SelectLeaf(mon, leafId, source := "manual") {
     global CurrentLeafSelection, CurrentHighlight, ManualNav
     if !mon {
+        if (source = "manual" || ManualNav.mon = mon)
+            ManualNav := {mon:0, leaf:0}
         HideHighlight()
         return
     }
@@ -123,6 +125,8 @@ SelectLeaf(mon, leafId, source := "manual") {
             CurrentLeafSelection.Delete(mon)
         if (CurrentHighlight.mon = mon)
             HideHighlight()
+        if (ManualNav.mon = mon)
+            ManualNav := {mon:0, leaf:0}
         return
     }
     if (source = "auto" && state.source = "manual" && state.leaf && state.leaf != leafId && !LeafHasWindows(mon, state.leaf))
@@ -130,6 +134,8 @@ SelectLeaf(mon, leafId, source := "manual") {
     CurrentLeafSelection[mon] := { leaf:leafId, source:source }
     if (source = "manual")
         ManualNav := { mon:mon, leaf:leafId }
+    else if (ManualNav.mon = mon)
+        ManualNav := {mon:0, leaf:0}
     ApplyLeafHighlight(mon, leafId)
 }
 

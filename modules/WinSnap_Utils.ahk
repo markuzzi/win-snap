@@ -9,19 +9,13 @@ ClampFrac(val) {
 GetActiveWindow() {
     try hwnd := WinGetID("A")
     catch
-        hwnd := 0
+        return 0
     if !hwnd || !WinExist("ahk_id " hwnd)
         return 0
-    try {
-        try {
-            WinGetPos &x, &y, &w, &h, "ahk_id " hwnd
-        } catch {
-            return 0
-        }
-    } catch {
+    try WinGetPos &x, &y, &w, &h, "ahk_id " hwnd
+    catch
         return 0
-    }
-    return { hwnd: hwnd, x: x, y: y, w: w, h: h }
+    return { hwnd:hwnd, x:x, y:y, w:w, h:h }
 }
 
 GetMonitorIndexAndArea(hwnd) {
