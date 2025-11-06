@@ -54,6 +54,8 @@ global WindowSearch := {gui:"", edit:"", list:"", items:[], filtered:[], ctx:{},
 #Include ".\modules\WinSnap_Selection.ahk"
 #Include ".\modules\WinSnap_Grid.ahk"
 
+TrayTip "WinSnap", "WinSnap geladen – Layouts bereit", 1500
+
 ; =========================
 ; Hotkeys
 ; =========================

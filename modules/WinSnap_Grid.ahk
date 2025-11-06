@@ -268,8 +268,7 @@ FindNeighborMonitor(mon, dir) {
     count := MonitorGetCount()
     best := 0
     bestScore := -1
-    global MAX_DIST := 1_000_000_000_000_000_000
-    bestDist := MAX_DIST
+    bestDist := 10**18
     Loop count {
         idx := A_Index
         if (idx = mon)
