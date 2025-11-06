@@ -3,7 +3,6 @@
 ; =========================
 
 SnapToLeaf(hwnd, mon, leafId) {
-    global LastDir
     r := GetLeafRect(mon, leafId)
     MoveWindow(hwnd, r.L, r.T, r.R - r.L, r.B - r.T)
     LeafAttachWindow(hwnd, mon, leafId)
@@ -67,12 +66,7 @@ GridMove(dir) {
         target := PickLeafForUnsapped(mon, dir, cx, cy)
         SnapToLeaf(hwnd, mon, target)
 
-        if (dir = "left" || dir = "right")
-            LastDir[hwnd] := dir
-        else if (dir = "up")
-            LastDir[hwnd] := "top"
-        else if (dir = "down")
-            LastDir[hwnd] := "bottom"
+        SetLastDirection(hwnd, dir)
         return
     }
 
@@ -81,12 +75,7 @@ GridMove(dir) {
     next := FindNeighborLeaf(mon, curLeaf, dir)
     if next {
         SnapToLeaf(hwnd, mon, next)
-        if (dir = "left" || dir = "right")
-            LastDir[hwnd] := dir
-        else if (dir = "up")
-            LastDir[hwnd] := "top"
-        else if (dir = "down")
-            LastDir[hwnd] := "bottom"
+        SetLastDirection(hwnd, dir)
     }
 }
 
@@ -110,22 +99,26 @@ PickLeafForUnsapped(mon, dir, cx, cy) {
 
     bestId := cands[1].id
     if (dir = "left") {
-        bestX :=  10**9
+        global MAX_X := 1_000_000_000
+        bestX := MAX_X
         for o in cands
             if (o.r.L < bestX)
                 bestX := o.r.L, bestId := o.id
     } else if (dir = "right") {
-        bestX := -10**9
+        global MIN_X := -1_000_000_000
+        bestX := MIN_X
         for o in cands
             if (o.r.R > bestX)
                 bestX := o.r.R, bestId := o.id
     } else if (dir = "up") {
-        bestY :=  10**9
+        global MAX_Y := 1_000_000_000
+        bestY := MAX_Y
         for o in cands
             if (o.r.T < bestY)
                 bestY := o.r.T, bestId := o.id
     } else if (dir = "down") {
-        bestY := -10**9
+        global MIN_Y := -1_000_000_000
+        bestY := MIN_Y
         for o in cands
             if (o.r.B > bestY)
                 bestY := o.r.B, bestId := o.id
@@ -278,7 +271,8 @@ FindNeighborMonitor(mon, dir) {
     count := MonitorGetCount()
     best := 0
     bestScore := -1
-    bestDist := 10**18
+    global MAX_DIST := 1_000_000_000_000_000_000
+    bestDist := MAX_DIST
     Loop count {
         idx := A_Index
         if (idx = mon)
@@ -372,4 +366,14 @@ ShowAllSnapAreasHotkey() {
     if !ctx.mon
         return
     ShowAllSnapAreasForMonitor(ctx.mon)
+}
+
+SetLastDirection(hwnd, dir) {
+    global LastDir
+    if (dir = "left" || dir = "right")
+        LastDir[hwnd] := dir
+    else if (dir = "up")
+        LastDir[hwnd] := "top"
+    else if (dir = "down")
+        LastDir[hwnd] := "bottom"
 }

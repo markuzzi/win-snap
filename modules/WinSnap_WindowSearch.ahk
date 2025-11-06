@@ -183,17 +183,8 @@ ArraySort(arr, compareFn) {
     n := arr.Length
     if (n < 2)
         return arr
-    for i, _ in arr {
-        for j, _ in arr {
-            if (j <= i)
-                continue
-            if (compareFn(arr[i], arr[j], 0) > 0) {
-                tmp := arr[i]
-                arr[i] := arr[j]
-                arr[j] := tmp
-            }
-        }
-    }
+    arr := arr.Clone()
+    arr.Sort(compareFn)
     return arr
 }
 

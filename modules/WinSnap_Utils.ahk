@@ -12,7 +12,15 @@ GetActiveWindow() {
         hwnd := 0
     if !hwnd || !WinExist("ahk_id " hwnd)
         return 0
-    WinGetPos &x, &y, &w, &h, "ahk_id " hwnd
+    try {
+        try {
+            WinGetPos &x, &y, &w, &h, "ahk_id " hwnd
+        } catch {
+            return 0
+        }
+    } catch {
+        return 0
+    }
     return { hwnd: hwnd, x: x, y: y, w: w, h: h }
 }
 
