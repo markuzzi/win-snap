@@ -45,6 +45,7 @@ global WindowSearch := {gui:"", edit:"", list:"", items:[], filtered:[], ctx:{},
 ; =========================
 ; Module-Includes
 ; =========================
+#Include ".\modules\_JXON.ahk"
 #Include ".\modules\WinSnap_Utils.ahk"
 #Include ".\modules\WinSnap_Highlight.ahk"
 #Include ".\modules\WinSnap_Overlays.ahk"

@@ -280,12 +280,11 @@ Layout_SaveAll() {
     global Layouts
     path := Layout_GetStoragePath()
     data := Layout_SerializeAll()
-    json := Layout_JsonDump(data, 2)
-    return
+    MsgBox(jxon_dump(data, indent:=2))
     try {
         file := FileOpen(path, "w", "UTF-8")
         if file {
-            file.Write(json)
+            file.Write(jxon_dump(data, indent:=2))
             file.Close()
         }
     } catch {
@@ -301,7 +300,7 @@ Layout_LoadAll() {
     try text := FileRead(path, "UTF-8")
     catch
         return
-    try data := Layout_JsonLoad(text)
+    try data := jxon_load(&text)
     catch
         return
     newLayouts := Map()
@@ -333,9 +332,9 @@ Layout_LoadAll() {
 
 Layout_SerializeAll() {
     global Layouts
-    data := {}
+    data := Map()
     for mon, layout in Layouts {
-        nodes := {}
+        nodes := Map()
         for id, node in layout.nodes {
             nodes[id] := {
                 parent: node.parent,
@@ -362,217 +361,3 @@ Layout_GetStoragePath() {
 }
 
 Layout_LoadAll()
-
-; =========================
-; Minimal JSON Helpers
-; =========================
-Layout_JsonDump(val, indent := 0, level := 0) {
-    if IsNumber(val)
-        return Format("{:g}", val+0)
-    if val is String
-        return Layout_JsonQuote(val)
-    if (val is Array) {
-        parts := []
-        for item in val
-            parts.Push(Layout_JsonDump(item, indent, level + 1))
-        return "[" Layout_Join(parts, ",") "]"
-    }
-    if (val is Map)
-        return Layout_JsonDumpMap(val, indent, level)
-    return Layout_JsonQuote(val)
-}
-
-Layout_JsonQuote(str) {
-    str := String(str)
-    buf := ""
-    Loop Parse str {
-        ch := A_LoopField
-        code := Ord(ch)
-        if (code = 34) ; "
-            buf .= "\\u0022"
-        else if (code = 92) ; \
-            buf .= "\\u005C"
-        else if (code < 0x20)
-            buf .= Format("\u{:04X}", code)
-        else
-            buf .= ch
-    }
-    return """" buf """"
-}
-
-Layout_JsonLoad(text) {
-    parser := { text:text, pos:1, len:StrLen(text) }
-    value := Layout_JsonParseValue(parser)
-    Layout_JsonSkipWhitespace(parser)
-    return value
-}
-
-Layout_JsonParseValue(p) {
-    Layout_JsonSkipWhitespace(p)
-    if (p.pos > p.len)
-        return ""
-    ch := SubStr(p.text, p.pos, 1)
-    if (ch = "{")
-        return Layout_JsonParseObject(p)
-    if (ch = "[")
-        return Layout_JsonParseArray(p)
-    if (ch = """")
-        return Layout_JsonParseString(p)
-    if RegExMatch(ch, "[\-\d]")
-        return Layout_JsonParseNumber(p)
-    if SubStr(p.text, p.pos, 4) = "true"
-        return Layout_JsonConsumeLiteral(p, "true", true)
-    if SubStr(p.text, p.pos, 5) = "false"
-        return Layout_JsonConsumeLiteral(p, "false", false)
-    if SubStr(p.text, p.pos, 4) = "null"
-        return Layout_JsonConsumeLiteral(p, "null", "")
-    return ""
-}
-
-Layout_JsonSkipWhitespace(p) {
-    while (p.pos <= p.len) {
-        ch := SubStr(p.text, p.pos, 1)
-        if ch ~= "\s"
-            p.pos += 1
-        else
-            break
-    }
-}
-
-Layout_JsonParseObject(p) {
-    obj := Map()
-    p.pos += 1
-    Layout_JsonSkipWhitespace(p)
-    if SubStr(p.text, p.pos, 1) = "}" {
-        p.pos += 1
-        return obj
-    }
-    loop {
-        key := Layout_JsonParseString(p)
-        Layout_JsonSkipWhitespace(p)
-        if SubStr(p.text, p.pos, 1) = ":" {
-            p.pos += 1
-        }
-        value := Layout_JsonParseValue(p)
-        obj[key] := value
-        Layout_JsonSkipWhitespace(p)
-        ch := SubStr(p.text, p.pos, 1)
-        if (ch = "}") {
-            p.pos += 1
-            break
-        } else if (ch = ",") {
-            p.pos += 1
-            continue
-        } else
-            break
-    }
-    return obj
-}
-
-Layout_JsonParseArray(p) {
-    arr := []
-    p.pos += 1
-    Layout_JsonSkipWhitespace(p)
-    if SubStr(p.text, p.pos, 1) = "]" {
-        p.pos += 1
-        return arr
-    }
-    loop {
-        arr.Push(Layout_JsonParseValue(p))
-        Layout_JsonSkipWhitespace(p)
-        ch := SubStr(p.text, p.pos, 1)
-        if (ch = "]") {
-            p.pos += 1
-            break
-        } else if (ch = ",") {
-            p.pos += 1
-            continue
-        } else
-            break
-    }
-    return arr
-}
-
-Layout_JsonParseString(p) {
-    result := ""
-    p.pos += 1
-    while (p.pos <= p.len) {
-        ch := SubStr(p.text, p.pos, 1)
-        code := Ord(ch)
-        if (code = 34) {
-            p.pos += 1
-            break
-        } else if (code = 92) {
-            next := SubStr(p.text, p.pos + 1, 1)
-            nextCode := Ord(next)
-            if (nextCode = 34)
-                result .= Chr(34)
-            else if (nextCode = 92)
-                result .= Chr(92)
-            else if (next = "/")
-                result .= "/"
-            else if (next = "b")
-                result .= Chr(8)
-            else if (next = "f")
-                result .= Chr(12)
-            else if (next = "n")
-                result .= "`n"
-            else if (next = "r")
-                result .= "`r"
-            else if (next = "t")
-                result .= "`t"
-            else if (next = "u") {
-                hex := SubStr(p.text, p.pos + 2, 4)
-                val := Integer("0x" hex)
-                result .= Chr(val)
-                p.pos += 4
-            } else
-                result .= next
-            p.pos += 2
-        } else {
-            result .= ch
-            p.pos += 1
-        }
-    }
-    return result
-}
-
-Layout_JsonParseNumber(p) {
-    start := p.pos
-    while (p.pos <= p.len) {
-        ch := SubStr(p.text, p.pos, 1)
-        if ch ~= "[0-9eE\+\-\.]"
-            p.pos += 1
-        else
-            break
-    }
-    numStr := SubStr(p.text, start, p.pos - start)
-    try {
-        return Integer(numStr)
-    } catch {
-        try {return numStr + 0}
-        catch {return 0}
-    }
-}
-
-Layout_JsonConsumeLiteral(p, literal, value) {
-    p.pos += StrLen(literal)
-    return value
-}
-
-Layout_Join(arr, sep) {
-    out := ""
-    for idx, val in arr {
-        if (idx > 1)
-            out .= sep
-        out .= val
-    }
-    return out
-}
-
-Layout_JsonDumpMap(obj, indent, level) {
-    parts := []
-    for key, item in obj
-        parts.Push(Layout_JsonQuote(key) ":" Layout_JsonDump(item, indent, level + 1))
-    return "{" Layout_Join(parts, ",") "}"
-}
