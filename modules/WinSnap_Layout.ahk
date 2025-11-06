@@ -280,7 +280,6 @@ Layout_SaveAll() {
     global Layouts
     path := Layout_GetStoragePath()
     data := Layout_SerializeAll()
-    MsgBox(jxon_dump(data, indent:=2))
     try {
         file := FileOpen(path, "w", "UTF-8")
         if file {
@@ -336,15 +335,19 @@ Layout_SerializeAll() {
     for mon, layout in Layouts {
         nodes := Map()
         for id, node in layout.nodes {
-            nodes[id] := {
-                parent: node.parent,
-                split: node.split,
-                frac: node.frac,
-                a: node.a,
-                b: node.b
-            }
+            nodeMap := Map()
+            nodeMap["parent"] := node.parent
+            nodeMap["split"] := node.split
+            nodeMap["frac"] := node.frac
+            nodeMap["a"] := node.a
+            nodeMap["b"] := node.b
+            nodes[String(id)] := nodeMap
         }
-        data[mon] := { root:layout.root, next:layout.next, nodes:nodes }
+        layoutMap := Map()
+        layoutMap["root"] := layout.root
+        layoutMap["next"] := layout.next
+        layoutMap["nodes"] := nodes
+        data[String(mon)] := layoutMap
     }
     return data
 }
