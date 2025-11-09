@@ -49,6 +49,14 @@ LeafAttachWindow(hwnd, mon, leafId) {
     arr.InsertAt(1, hwnd)
     WinToLeaf[hwnd] := { mon:mon, leaf:leafId }
     SelectLeaf(mon, leafId, "auto")
+
+    try {
+        SaveLeafAssignment(mon, leafId, hwnd)
+    }
+    catch {
+        MsgBox "Fehler beim Speichern der Fenster-Zuordnung!"
+    }
+
 }
 
 LeafDetachWindow(hwnd, removeMapping := false) {

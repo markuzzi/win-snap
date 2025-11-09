@@ -422,4 +422,115 @@ Layout_GetStoragePath() {
 }
 
 
+; Window Leaf Assignments speichern/laden
+SaveLeafAssignment(mon, leafId, hwnd) {
+    global Layouts
+    Layout_Ensure(mon)
+
+    exe := WinGetProcessName("ahk_id " hwnd)
+    title := WinGetTitle("ahk_id " hwnd)
+    if (!exe || !title)
+        return
+
+    ; Initialisiere assignments-Array falls nicht vorhanden
+    if !Layouts[mon].HasOwnProp("assignments")
+        Layouts[mon].assignments := []
+
+    assignments := Layouts[mon].assignments
+
+    ; Duplikate entfernen
+    for i, entry in assignments {
+        if (entry.exe = exe && entry.title = title) {
+            assignments.RemoveAt(i)
+            break
+        }
+    }
+
+    assignments.Push({leaf:leafId, exe:exe, title:title})
+
+    Layout_SaveAll()
+}
+
+AutoSnap_AssignedWindows() {
+    global Layouts
+    for mon, layout in Layouts {
+        if !layout.HasOwnProp("assignments")
+            continue
+
+        for entry in layout.assignments {
+            if !entry.HasOwnProp("exe") || !entry.HasOwnProp("title") || !entry.HasOwnProp("leaf")
+                continue
+
+            try {
+                ; Nach Fenster suchen, das zu exe UND title passt
+                WinGetList &list
+                for hwnd in list {
+                    WinGetProcessName &winExe, "ahk_id " hwnd
+                    WinGetTitle &winTitle, "ahk_id " hwnd
+
+                    if (winExe = entry.exe && winTitle = entry.title) {
+                        r := GetLeafRect(mon, entry.leaf)
+                        WinGetPos &x, &y, &w, &h, "ahk_id " hwnd
+                        if (Abs(r.L - x) > 5 || Abs(r.T - y) > 5)
+                            LeafAttachWindow(hwnd, mon, entry.leaf)
+                        break
+                    }
+                }
+            } catch {
+                ; Ignorieren, falls Fehler
+            }
+        }
+    }
+}
+
+FindWindow(exe, title := "") {
+    idList := WinGetList()
+    for hwnd in idList {
+        try {
+            thisExe := WinGetProcessName("ahk_id " hwnd)
+            thisTitle := WinGetTitle("ahk_id " hwnd)
+            if (thisExe = exe && (title = "" || InStr(thisTitle, title)))
+                return hwnd
+        }
+    }
+    return 0
+}
+
+AutoSnap_NewlyStartedWindows() {
+    global Layouts
+    for mon, layout in Layouts {
+        if !layout.HasOwnProp("assignments")
+            continue
+
+        for entry in layout.assignments {
+            hwnd := FindWindow(entry.exe, entry.title)
+            if (hwnd) {
+                try {
+                    x := y := w := h := 0
+                    WinGetPos &x, &y, &w, &h, "ahk_id " hwnd
+                    if (x < 10 && y < 10) {
+                        ; Snap to assigned leaf
+                        SnapWindowToLeaf(hwnd, mon, entry.leaf)
+                    }
+                }
+            }
+        }
+    }
+}
+
+SnapWindowToLeaf(hwnd, mon, leafId) {
+    rect := GetLeafRect(mon, leafId)
+    MoveWindow(hwnd, rect.L, rect.T, rect.R - rect.L, rect.B - rect.T)
+    LeafAttachWindow(hwnd, mon, leafId)
+}
+
+
+
 Layout_LoadAll()
+
+; Nach dem Laden des Layouts:
+SetTimer(AutoSnap_AssignedWindows, -100)
+
+; Prüft regelmäßig auf neue Fenster, die einsortiert werden sollen
+SetTimer(AutoSnap_NewlyStartedWindows, 2000)
+
