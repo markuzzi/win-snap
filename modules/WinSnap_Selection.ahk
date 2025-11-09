@@ -62,11 +62,16 @@ LeafRecordActivation(hwnd) {
     idx := 1
     while (idx <= arr.Length) {
         current := arr[idx]
+        try {
+            exists := WinExist("ahk_id " current)
+        } catch {
+            exists := false
+        }
         if (current = hwnd) {
             arr.RemoveAt(idx)
             break
         }
-        if !WinExist("ahk_id " current)
+        if !exists
             arr.RemoveAt(idx)
         else
             idx++
@@ -87,8 +92,8 @@ GetLeafNavigationContext() {
         monInfo := GetMonitorIndexAndArea(hwnd)
         mon := monInfo.index
         Layout_Ensure(mon)
-        cx := win.x + win.w/2
-        cy := win.y + win.h/2
+        cx := win.x + win.w / 2
+        cy := win.y + win.h / 2
         leaf := GetSelectedLeaf(mon)
         if !leaf
             leaf := Layout_FindLeafAtPoint(mon, cx, cy)

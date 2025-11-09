@@ -1,5 +1,8 @@
 ﻿#Requires AutoHotkey v2.0
 #SingleInstance Force
+#Warn
+#ErrorStdOut 'CP0'
+
 SendMode "Input"
 SetWinDelay 0
 
@@ -131,6 +134,9 @@ Esc:: {
 
 ; Alt+Shift+O: alle Snap-Areas kurz hervorheben
 !+o::ShowAllSnapAreasHotkey()
+
+; Alt+Shift+A: alle Fenster in der aktiven Snap-Area einsammeln
+!+a::CollectWindowsInActiveLeaf()
 
 ; Strg+Shift+Up/Down: Fenster innerhalb einer Area wechseln
 ^+Up::   CycleWindowInLeaf("prev")

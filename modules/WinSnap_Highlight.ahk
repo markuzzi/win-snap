@@ -22,23 +22,30 @@ ShowHighlightRect(rect) {
     if !HighlightEnabled
         return
     HL_Init()
-    x := rect.L
-    y := rect.T
+    x := rect.L, y := rect.T
     w := rect.R - rect.L
     h := rect.B - rect.T
-    HL.top.Move(x-1, y-1, w+2, BorderPx),   HL.top.Show("NA")
-    HL.bot.Move(x-1, y+h-1, w+2, BorderPx), HL.bot.Show("NA")
-    HL.left.Move(x-1, y-1, BorderPx, h+2),  HL.left.Show("NA")
-    HL.right.Move(x+w-1, y-1, BorderPx, h+2), HL.right.Show("NA")
+    HL.top.Move(x-1, y-1, w+2, BorderPx),      HL.top.Show("NA")
+    HL.bot.Move(x-1, y+h-1, w+2, BorderPx),    HL.bot.Show("NA")
+    HL.left.Move(x-1, y-1, BorderPx, h+2),     HL.left.Show("NA")
+    HL.right.Move(x+w-1, y-1, BorderPx, h+2),  HL.right.Show("NA")
 }
 
 HideHighlight() {
     global HL, CurrentHighlight
     if HL.init {
-        try HL.top.Hide()
-        try HL.bot.Hide()
-        try HL.left.Hide()
-        try HL.right.Hide()
+        try {
+            HL.top.Hide()
+        }
+        try {
+            HL.bot.Hide()
+        }
+        try {
+            HL.left.Hide()
+        }
+        try {
+            HL.right.Hide()
+        }
     }
     CurrentHighlight := {mon:0, leaf:0}
 }
@@ -60,7 +67,7 @@ ApplyLeafHighlight(mon, leafId) {
         HideHighlight()
         return
     }
-    rect := GetLeafRect(mon, leafId)
+    rect := ToPixelRect(mon, GetLeafRect(mon, leafId))
     ShowHighlightRect(rect)
     CurrentHighlight := {mon:mon, leaf:leafId}
 }
@@ -74,12 +81,13 @@ UpdateActiveHighlight(*) {
     }
     if WindowSearch.active
         return
-    try hwnd := WinGetID("A")
-    catch
+    try {
+        hwnd := WinGetID("A")
+    } catch {
         hwnd := 0
-    if !hwnd || !WinExist("ahk_id " hwnd) {
-        return
     }
+    if !hwnd || !DllCall("IsWindow", "ptr", hwnd) || !WinExist("ahk_id " hwnd)
+        return
     if WinToLeaf.Has(hwnd)
         LeafRecordActivation(hwnd)
     else {

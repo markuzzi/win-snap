@@ -2,10 +2,12 @@
 ; Snap / UnSnap / Grid-Navigation
 ; =========================
 
+
 SnapToLeaf(hwnd, mon, leafId) {
-    r := GetLeafRect(mon, leafId)
+    r := GetLeafRectPx(mon, leafId)
     MoveWindow(hwnd, r.L, r.T, r.R - r.L, r.B - r.T)
     LeafAttachWindow(hwnd, mon, leafId)
+    ApplyLeafHighlight(mon, leafId)
 }
 
 MoveWindowIntoLeaf(hwnd, ctx) {
@@ -25,7 +27,7 @@ EnsureHistory(hwnd) {
 
 UnSnapWindow(hwnd) {
     global WinHistory, LastDir
-    if WinHistory.Has(hwnd) && WinExist("ahk_id " hwnd) {
+    if WinHistory.Has(hwnd) && DllCall("IsWindow", "ptr", hwnd) && WinExist("ahk_id " hwnd) {
         prev := WinHistory[hwnd]
         if MoveWindow(hwnd, prev.x, prev.y, prev.w, prev.h) {
             WinHistory.Delete(hwnd)
@@ -76,26 +78,49 @@ GridMove(dir) {
     if next {
         SnapToLeaf(hwnd, mon, next)
         SetLastDirection(hwnd, dir)
+        return
     }
+
+    ; --- Kein Nachbar-Leaf → versuche Nachbar-Monitor ---
+    nextMon := FindNeighborMonitor(mon, dir)
+    if !nextMon
+        return
+
+    Layout_Ensure(nextMon)
+    nextLeaf := GetSelectedLeaf(nextMon)
+    if !nextLeaf
+        nextLeaf := Layouts[nextMon].root
+
+    ; Fenster physisch auf den nächsten Monitor verschieben
+    r := GetLeafRect(nextMon, nextLeaf)
+    MoveWindow(hwnd, r.L, r.T, r.R - r.L, r.B - r.T)
+    LeafDetachWindow(hwnd, true)
+    LeafAttachWindow(hwnd, nextMon, nextLeaf)
+    ApplyLeafHighlight(nextMon, nextLeaf)
+    SetLastDirection(hwnd, dir)
 }
 
 ; Für „erstes Snap“ (wenn noch nicht gesnappt): passende Leaf in Richtung wählen
 PickLeafForUnsapped(mon, dir, cx, cy) {
+    Layout_Ensure(mon)
     rects := Layout_AllLeafRects(mon)
     cands := []
     for id, r in rects {
+        rr := ToPixelRect(mon, r) ; sicher in Pixel vergleichen
         if (dir = "left" || dir = "right") {
-            if (cy >= r.T && cy < r.B)
-                cands.Push({id:id, r:r})
+            if (cy >= rr.T && cy < rr.B)
+                cands.Push({id:id, r:rr})
         } else {
-            if (cx >= r.L && cx < r.R)
-                cands.Push({id:id, r:r})
+            if (cx >= rr.L && cx < rr.R)
+                cands.Push({id:id, r:rr})
         }
     }
     if (cands.Length = 0) {
         for id, r in rects
-            cands.Push({id:id, r:r})
+            cands.Push({id:id, r:ToPixelRect(mon, r)})
     }
+    if (cands.Length = 0)
+        return Layouts[mon].root
 
     bestId := cands[1].id
     if (dir = "left") {
@@ -151,11 +176,19 @@ SplitCurrentLeaf(orient) {
     }
 
     nBefore := Layout_Node(mon, leaf)
+    if !nBefore {
+        leaf := Layouts[mon].root
+        nBefore := Layout_Node(mon, leaf)
+        if !nBefore
+            return
+    }
     if (nBefore.split != "")
         return
     Layout_SplitLeaf(mon, leaf, orient)
 
     nAfter := Layout_Node(mon, leaf)   ; nun interner Knoten
+    if !nAfter
+        return
     leftOrTop := nAfter.a
     SelectLeaf(mon, leftOrTop, "manual")
     SnapToLeaf(hwnd, mon, leftOrTop)
@@ -333,9 +366,13 @@ DeleteCurrentSnapArea() {
     if (rects.Count <= 1)
         return
     node := Layout_Node(ctx.mon, ctx.leaf)
+    if !node
+        return
     if (node.parent = 0)
         return
     parent := Layout_Node(ctx.mon, node.parent)
+    if !parent
+        return
     siblingId := (parent.a = ctx.leaf) ? parent.b : parent.a
     if (siblingId = 0)
         return
@@ -346,7 +383,7 @@ DeleteCurrentSnapArea() {
     if !promoted
         return
     for hwnd in arrCopy {
-        if WinExist("ahk_id " hwnd)
+        if DllCall("IsWindow", "ptr", hwnd) && WinExist("ahk_id " hwnd)
             SnapToLeaf(hwnd, ctx.mon, siblingId)
     }
     key := LeafKey(ctx.mon, ctx.leaf)
@@ -362,6 +399,94 @@ ShowAllSnapAreasHotkey() {
     if !ctx.mon
         return
     ShowAllSnapAreasForMonitor(ctx.mon)
+}
+
+CollectWindowsInActiveLeaf() {
+    global Layouts
+    ctx := ApplyManualNavigation(GetLeafNavigationContext())
+    if !ctx.mon
+        return
+    Layout_Ensure(ctx.mon)
+    if !ctx.leaf {
+        sel := GetSelectedLeaf(ctx.mon)
+        ctx.leaf := sel ? sel : Layouts[ctx.mon].root
+    }
+    if !ctx.leaf
+        return
+    if !Layouts[ctx.mon].nodes.Has(ctx.leaf)
+        ctx.leaf := Layouts[ctx.mon].root
+    rect := GetLeafRectPx(ctx.mon, ctx.leaf)
+    ids := WinGetList()
+    collected := 0
+    for hwnd in ids {
+        if !IsCollectibleSnapWindow(hwnd)
+            continue
+        if !WindowCenterInsideRect(hwnd, rect)
+            continue
+        EnsureHistory(hwnd)
+        SnapToLeaf(hwnd, ctx.mon, ctx.leaf)
+        collected += 1
+    }
+    SelectLeaf(ctx.mon, ctx.leaf, "manual")
+    FlashLeafOutline(ctx.mon, ctx.leaf)
+    if (collected > 0) {
+        top := LeafGetTopWindow(ctx.mon, ctx.leaf)
+        if top
+            WinActivate "ahk_id " top
+    }
+}
+
+IsCollectibleSnapWindow(hwnd) {
+    static scriptPid := DllCall("GetCurrentProcessId")
+    if !hwnd
+        return false
+    if !DllCall("IsWindow", "ptr", hwnd) || !WinExist("ahk_id " hwnd)
+        return false
+    try {
+        pid := WinGetPID("ahk_id " hwnd)
+    } catch {
+        pid := 0
+    }
+    if (pid = scriptPid)
+        return false
+    try {
+        className := WinGetClass("ahk_id " hwnd)
+    } catch {
+        className := ""
+    }
+    if (className = "Shell_TrayWnd" || className = "MultitaskingViewFrame" || className = "Progman")
+        return false
+    try {
+        style := WinGetStyle("ahk_id " hwnd)
+    } catch {
+        style := 0
+    }
+    WS_VISIBLE := 0x10000000
+    if !(style & WS_VISIBLE)
+        return false
+    try {
+        mm := WinGetMinMax("ahk_id " hwnd)
+    } catch {
+        mm := 0
+    }
+    if (mm = -1)
+        return false
+    return true
+}
+
+WindowCenterInsideRect(hwnd, rect) {
+    if !hwnd
+        return false
+    try {
+        WinGetPos &x, &y, &w, &h, "ahk_id " hwnd
+    } catch {
+        return false
+    }
+    if (w <= 0 || h <= 0)
+        return false
+    cx := x + (w / 2)
+    cy := y + (h / 2)
+    return (cx >= rect.L && cx <= rect.R && cy >= rect.T && cy <= rect.B)
 }
 
 SetLastDirection(hwnd, dir) {

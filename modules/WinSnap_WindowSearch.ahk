@@ -9,14 +9,14 @@ InitWindowSearchGui() {
     g.MarginX := 12
     g.MarginY := 12
     g.BackColor := "0x202020"
-    edit := g.AddEdit("w420 vSearchInput")
+    editControl := g.AddEdit("w420 vSearchInput")
     list := g.AddListBox("w420 h220")
-    edit.OnEvent("Change", WindowSearch_OnInput)
+    editControl.OnEvent("Change", WindowSearch_OnInput)
     list.OnEvent("DoubleClick", WindowSearch_OnConfirm)
     g.OnEvent("Escape", (*) => WindowSearch_Close())
     g.OnEvent("Close", (*) => WindowSearch_Close())
     WindowSearch.gui := g
-    WindowSearch.edit := edit
+    WindowSearch.edit := editControl
     WindowSearch.list := list
 }
 
@@ -28,15 +28,19 @@ BuildWindowCandidateList() {
     for hwnd in ids {
         if (hwnd = exclusion)
             continue
-        if !WinExist("ahk_id " hwnd)
+        if !DllCall("IsWindow", "ptr", hwnd) || !WinExist("ahk_id " hwnd)
             continue
         title := Trim(WinGetTitle("ahk_id " hwnd))
-        class := ""
-        try class := WinGetClass("ahk_id " hwnd)
-        if (class = "Shell_TrayWnd" || class = "MultitaskingViewFrame")
+        className := ""
+        try {
+            className := WinGetClass("ahk_id " hwnd)
+        }
+        if (className = "Shell_TrayWnd" || className = "MultitaskingViewFrame")
             continue
         proc := ""
-        try proc := WinGetProcessName("ahk_id " hwnd)
+        try {
+            proc := WinGetProcessName("ahk_id " hwnd)
+        }
         if (title = "")
             title := "[Ohne Titel]"
         display := title
@@ -65,23 +69,28 @@ WindowSearch_Open() {
     WindowSearch_Update("")
     Layout_Ensure(ctx.mon)
     rect := GetLeafRect(ctx.mon, ctx.leaf)
-    WindowSearch.gui.Show("AutoSize")
-    WindowSearch.gui.GetPos(, , &guiW, &guiH)
-    if (!guiW) {
-        guiW := 420  ; fallback to default width if GetPos failed
+    try {
+        WindowSearch.gui.Show("AutoSize")
+        WindowSearch.gui.GetPos(, , &guiW, &guiH)
+    } catch {
+        guiW := 420, guiH := 260
     }
     gx := rect.L + ((rect.R - rect.L) - guiW) / 2
     gy := rect.T + 40
-    WindowSearch.gui.Move(Round(gx), Round(gy))
-    WindowSearch.gui.Show()
-    WindowSearch.edit.Focus()
+    try {
+        WindowSearch.gui.Move(Round(gx), Round(gy))
+        WindowSearch.gui.Show()
+        WindowSearch.edit.Focus()
+    }
 }
 
 WindowSearch_Close() {
     global WindowSearch
     if !WindowSearch.gui
         return
-    WindowSearch.gui.Hide()
+    try {
+        WindowSearch.gui.Hide()
+    }
     WindowSearch.active := false
 }
 
@@ -115,9 +124,8 @@ WindowSearch_Update(term := "") {
     filtered := []
     for item in WindowSearch.items {
         score := WindowSearch_Score(termLower, item.search)
-        if (termLower = "" || score > -9999) {
+        if (termLower = "" || score > -9999)
             filtered.Push({ hwnd:item.hwnd, title:item.title, proc:item.proc, display:item.display, search:item.search, score:score })
-        }
     }
     if (termLower != "")
         filtered := ArraySort(filtered, WindowSearch_CompareScore)
@@ -178,13 +186,34 @@ WindowSearch_CompareTitle(a, b, *) {
     return 0
 }
 
-ArraySort(arr, compareFn) {
+ArraySort(arr, compareFn := "") {
+    if !(arr is Array)
+        throw Error("ArraySort() erwartet ein Array.")
     if (arr.Length < 2)
         return arr.Clone()
+
     sorted := arr.Clone()
-    sorted.Sort(compareFn)
+    len := sorted.Length
+
+    ; Bubble-Sort (einfach, stabil, v2-kompatibel)
+    loop len - 1 {
+        i := A_Index
+        j := 1
+        while (j <= len - i) {
+            a := sorted[j]
+            b := sorted[j + 1]
+            cmp := compareFn ? compareFn(a, b) : (a > b ? 1 : (a < b ? -1 : 0))
+            if (cmp > 0) {
+                tmp := sorted[j]
+                sorted[j] := sorted[j + 1]
+                sorted[j + 1] := tmp
+            }
+            j += 1
+        }
+    }
     return sorted
 }
+
 
 WindowSearch_ItemTitle(item) {
     if IsObject(item) && item.HasOwnProp("title")

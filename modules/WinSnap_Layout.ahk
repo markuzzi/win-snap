@@ -3,7 +3,17 @@
 ; =========================
 Layout_Ensure(mon) {
     global Layouts
-    if Layouts.Has(mon)
+    needsReset := false
+    if !Layouts.Has(mon) {
+        needsReset := true
+    } else {
+        layout := Layouts[mon]
+        if !layout.HasOwnProp("nodes") || !IsObject(layout.nodes)
+            needsReset := true
+        else if !layout.nodes.Has(layout.root)
+            needsReset := true
+    }
+    if !needsReset
         return
     nodes := Map()
     nodes[1] := { id:1, parent:0, split:"", frac:0.5, a:0, b:0 }  ; root unsplittet
@@ -13,12 +23,22 @@ Layout_Ensure(mon) {
 
 Layout_Node(mon, id) {
     global Layouts
-    return Layouts[mon].nodes[id]
+    Layout_Ensure(mon)
+    if !Layouts.Has(mon)
+        return 0
+    nodes := Layouts[mon].nodes
+    return nodes.Has(id) ? nodes[id] : 0
 }
 
 Layout_IsLeaf(mon, id) {
     global Layouts
-    n := Layouts[mon].nodes[id]
+    Layout_Ensure(mon)
+    if !Layouts.Has(mon)
+        return false
+    nodes := Layouts[mon].nodes
+    if !nodes.Has(id)
+        return false
+    n := nodes[id]
     return (n.split = "")
 }
 
@@ -27,7 +47,7 @@ Layout_SplitLeaf(mon, leafId, orient) {
     Layout_Ensure(mon)
     n := Layouts[mon].nodes[leafId]
     if (n.split != "")
-        return  ; bereits gesplittet
+        return
     idA := Layouts[mon].next
     idB := idA + 1
     Layouts[mon].next := idB + 1
@@ -35,24 +55,34 @@ Layout_SplitLeaf(mon, leafId, orient) {
     Layouts[mon].nodes[idB] := { id:idB, parent:leafId, split:"", frac:0.5, a:0, b:0 }
     n.split := (orient = "v") ? "v" : "h"
     n.frac  := 0.5
-    n.a := idA, n.b := idB
+    n.a := idA
+    n.b := idB
     Layout_SaveAll()
 }
 
-; Rechteck für einen Node berechnen
 Layout_NodeRect(mon, nodeId) {
+    global Layouts
+    Layout_Ensure(mon)
     monInfo := GetMonitorWork(mon)
     rect := { L:monInfo.left, T:monInfo.top, R:monInfo.right, B:monInfo.bottom }
-
-    global Layouts
+    if !Layouts.Has(mon)
+        return rect
     nodes := Layouts[mon].nodes
+    if !nodes.Has(nodeId)
+        nodeId := Layouts[mon].root
+    if !nodes.Has(nodeId)
+        return rect
 
-    ; Pfad von leaf zum Root (Root -> Leaf ablaufen)
     path := []
     cur := nodeId
-    while (cur != Layouts[mon].root) {
+    rootId := Layouts[mon].root
+    while (cur != rootId) {
+        if !nodes.Has(cur)
+            break
         parent := nodes[cur].parent
-        path.InsertAt(1, { parent: parent, child: cur })   ; vorne einfügen
+        if (parent = 0 || !nodes.Has(parent))
+            break
+        path.InsertAt(1, { parent: parent, child: cur })
         cur := parent
     }
 
@@ -60,16 +90,14 @@ Layout_NodeRect(mon, nodeId) {
         p := nodes[step.parent]
         if (p.split = "v") {
             midX := rect.L + Round((rect.R - rect.L) * p.frac)
-            if (step.child = p.a)
-                rect := { L:rect.L, T:rect.T, R:midX, B:rect.B }    ; links
-            else
-                rect := { L:midX, T:rect.T, R:rect.R, B:rect.B }    ; rechts
+            rect := (step.child = p.a)
+                ? { L:rect.L, T:rect.T, R:midX, B:rect.B }
+                : { L:midX, T:rect.T, R:rect.R, B:rect.B }
         } else if (p.split = "h") {
             midY := rect.T + Round((rect.B - rect.T) * p.frac)
-            if (step.child = p.a)
-                rect := { L:rect.L, T:rect.T, R:rect.R, B:midY }    ; oben
-            else
-                rect := { L:rect.L, T:midY, R:rect.R, B:rect.B }    ; unten
+            rect := (step.child = p.a)
+                ? { L:rect.L, T:rect.T, R:rect.R, B:midY }
+                : { L:rect.L, T:midY, R:rect.R, B:rect.B }
         }
     }
     return rect
@@ -102,6 +130,9 @@ GetLeafRect(mon, leafId) {
 
 Layout_AllLeafRects(mon) {
     global Layouts
+    Layout_Ensure(mon)
+    if !Layouts.Has(mon)
+        return Map()
     out := Map()
     for id, n in Layouts[mon].nodes {
         if (n.split = "")
@@ -112,28 +143,37 @@ Layout_AllLeafRects(mon) {
 
 Layout_FindLeafAtPoint(mon, x, y) {
     global Layouts
+    Layout_Ensure(mon)
+    if !Layouts.Has(mon)
+        return 0
     rect := GetMonitorWork(mon)
-    id := Layouts[mon].root
-    while true {
-        n := Layouts[mon].nodes[id]
+    nodes := Layouts[mon].nodes
+    rootId := Layouts[mon].root
+    if !nodes.Has(rootId)
+        return 0
+    id := rootId
+    loop {
+        if !nodes.Has(id)
+            return rootId
+        n := nodes[id]
         if (n.split = "")
             return id
         if (n.split = "v") {
             midX := rect.left + Round((rect.right - rect.left) * n.frac)
             if (x < midX) {
-                id := n.a
+                id := n.a ? n.a : rootId
                 rect := { left:rect.left, top:rect.top, right:midX, bottom:rect.bottom }
             } else {
-                id := n.b
+                id := n.b ? n.b : rootId
                 rect := { left:midX, top:rect.top, right:rect.right, bottom:rect.bottom }
             }
         } else {
             midY := rect.top + Round((rect.bottom - rect.top) * n.frac)
             if (y < midY) {
-                id := n.a
+                id := n.a ? n.a : rootId
                 rect := { left:rect.left, top:rect.top, right:rect.right, bottom:midY }
             } else {
-                id := n.b
+                id := n.b ? n.b : rootId
                 rect := { left:rect.left, top:midY, right:rect.right, bottom:rect.bottom }
             }
         }
@@ -176,52 +216,38 @@ Layout_RemoveLeaf(mon, leafId) {
     return siblingId
 }
 
-; Nachbar-Leaf neben current in Richtung dir finden
 FindNeighborLeaf(mon, leafId, dir) {
     rects := Layout_AllLeafRects(mon)
     if !rects.Has(leafId)
         return 0
     cur := rects[leafId]
     tol := 2
-
     bestId := 0
     bestScore := -99999
-
     for id, r in rects {
         if (id = leafId)
             continue
-        if (dir = "left") {
-            if (Abs(r.R - cur.L) <= tol) {
-                overlap := Min(r.B, cur.B) - Max(r.T, cur.T)
-                if (overlap > 0 && overlap > bestScore)
-                    bestScore := overlap, bestId := id
-            }
-        } else if (dir = "right") {
-            if (Abs(r.L - cur.R) <= tol) {
-                overlap := Min(r.B, cur.B) - Max(r.T, cur.T)
-                if (overlap > 0 && overlap > bestScore)
-                    bestScore := overlap, bestId := id
-            }
-        } else if (dir = "up") {
-            if (Abs(r.B - cur.T) <= tol) {
-                overlap := Min(r.R, cur.R) - Max(r.L, cur.L)
-                if (overlap > 0 && overlap > bestScore)
-                    bestScore := overlap, bestId := id
-            }
-        } else if (dir = "down") {
-            if (Abs(r.T - cur.B) <= tol) {
-                overlap := Min(r.R, cur.R) - Max(r.L, cur.L)
-                if (overlap > 0 && overlap > bestScore)
-                    bestScore := overlap, bestId := id
-            }
+        if (dir = "left" && Abs(r.R - cur.L) <= tol) {
+            overlap := Min(r.B, cur.B) - Max(r.T, cur.T)
+            if (overlap > 0 && overlap > bestScore)
+                bestScore := overlap, bestId := id
+        } else if (dir = "right" && Abs(r.L - cur.R) <= tol) {
+            overlap := Min(r.B, cur.B) - Max(r.T, cur.T)
+            if (overlap > 0 && overlap > bestScore)
+                bestScore := overlap, bestId := id
+        } else if (dir = "up" && Abs(r.B - cur.T) <= tol) {
+            overlap := Min(r.R, cur.R) - Max(r.L, cur.L)
+            if (overlap > 0 && overlap > bestScore)
+                bestScore := overlap, bestId := id
+        } else if (dir = "down" && Abs(r.T - cur.B) <= tol) {
+            overlap := Min(r.R, cur.R) - Max(r.L, cur.L)
+            if (overlap > 0 && overlap > bestScore)
+                bestScore := overlap, bestId := id
         }
     }
     return bestId
 }
 
-; =========================
-; Iterative Helfer (ohne Closures)
-; =========================
 Layout_LeavesUnder(mon, id) {
     global Layouts
     arr := []
@@ -255,16 +281,12 @@ IsDescendant(mon, needle, rootId) {
     return false
 }
 
-; =========================
-; Reflow nur der betroffenen Split-Gruppe
-; =========================
 ReapplySubtree(mon, nodeId) {
     global WinToLeaf, Layouts
     leaves := Layout_LeavesUnder(mon, nodeId)
     set := Map()
     for id in leaves
         set[id] := true
-
     for hwnd, info in WinToLeaf {
         if (info.mon = mon) && set.Has(info.leaf) {
             r := GetLeafRect(mon, info.leaf)
@@ -273,18 +295,15 @@ ReapplySubtree(mon, nodeId) {
     }
 }
 
-; =========================
-; Layout Persistence
-; =========================
 Layout_SaveAll() {
     global Layouts
     path := Layout_GetStoragePath()
     data := Layout_SerializeAll()
     try {
-        file := FileOpen(path, "w", "UTF-8")
-        if file {
-            file.Write(jxon_dump(data, indent:=2))
-            file.Close()
+        layoutFile := FileOpen(path, "w", "UTF-8")
+        if (layoutFile) {
+            layoutFile.Write(jxon_dump(data, indent:=2))
+            layoutFile.Close()
         }
     } catch {
         ; ignore persistence errors
@@ -296,12 +315,16 @@ Layout_LoadAll() {
     path := Layout_GetStoragePath()
     if !FileExist(path)
         return
-    try text := FileRead(path, "UTF-8")
-    catch
+    try {
+        text := FileRead(path, "UTF-8")
+    } catch {
         return
-    try data := jxon_load(&text)
-    catch
+    }
+    try {
+        data := jxon_load(&text)
+    } catch {
         return
+    }
     newLayouts := Map()
     for mon, layout in data {
         monIdx := Layout_ToInt(mon, 1)
@@ -353,10 +376,11 @@ Layout_SerializeAll() {
 }
 
 Layout_ToInt(value, default := 0) {
-    try
+    try {
         return Integer(value)
-    catch
+    } catch {
         return default
+    }
 }
 
 Layout_GetStoragePath() {

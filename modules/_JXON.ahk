@@ -48,7 +48,7 @@ Jxon_Load(&src, args*) {
 		if !InStr(next, ch, true) {
 			testArr := StrSplit(SubStr(src, 1, pos), "`n")
 			
-			ln := testArr.Length
+			length := testArr.Length
 			col := pos - InStr(src, "`n",, -(StrLen(src)-pos+1))
 
 			msg := Format("{}: line {} col {} (char {})"
@@ -62,7 +62,7 @@ Jxon_Load(&src, args*) {
 			  : (next == ",]")    ? "Expecting ',' delimiter or array closing ']'"
 			  : [ "Expecting JSON value(string, number, [true, false, null], object or array)"
 			    , ch := SubStr(src, pos, (SubStr(src, pos)~="[\]\},\s]|$")-1) ][1]
-			, ln, col, pos)
+			, length, col, pos)
 
 			throw Error(msg, -1, ch)
 		}

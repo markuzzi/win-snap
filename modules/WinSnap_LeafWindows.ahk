@@ -13,7 +13,12 @@ LeafCleanupList(key) {
     idx := 1
     while (idx <= arr.Length) {
         hwnd := arr[idx]
-        if !WinExist("ahk_id " hwnd)
+        try {
+            exists := DllCall("IsWindow", "ptr", hwnd) && WinExist("ahk_id " hwnd)
+        } catch {
+            exists := false
+        }
+        if !exists
             arr.RemoveAt(idx)
         else
             idx++
@@ -78,7 +83,12 @@ LeafGetTopWindow(mon, leafId) {
     idx := 1
     while (idx <= arr.Length) {
         hwnd := arr[idx]
-        if WinExist("ahk_id " hwnd)
+        try {
+            exists := DllCall("IsWindow", "ptr", hwnd) && WinExist("ahk_id " hwnd)
+        } catch {
+            exists := false
+        }
+        if exists
             return hwnd
         arr.RemoveAt(idx)
     }
@@ -93,7 +103,5 @@ LeafGetOrderedList(mon, leafId) {
     if !LeafWindows.Has(key)
         return []
     LeafCleanupList(key)
-    if !LeafWindows.Has(key)
-        return []
-    return LeafWindows[key]
+    return LeafWindows.Has(key) ? LeafWindows[key] : []
 }
