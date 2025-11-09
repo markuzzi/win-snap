@@ -295,39 +295,59 @@ ReapplySubtree(mon, nodeId) {
     }
 }
 
+; =========================
+; Layout Persistence (multi-monitor-safe)
+; =========================
 Layout_SaveAll() {
     global Layouts
     path := Layout_GetStoragePath()
     data := Layout_SerializeAll()
     try {
         layoutFile := FileOpen(path, "w", "UTF-8")
-        if (layoutFile) {
-            layoutFile.Write(jxon_dump(data, indent:=2))
+        if layoutFile {
+            layoutFile.Write(jxon_dump(data, indent := 2))
             layoutFile.Close()
         }
     } catch {
-        ; ignore persistence errors
+        MsgBox "Layout_SaveAll(): Fehler beim Schreiben der Layout-Datei!"
     }
 }
 
 Layout_LoadAll() {
     global Layouts
     path := Layout_GetStoragePath()
-    if !FileExist(path)
+    Layouts := Map()
+
+    if !FileExist(path) {
+        ; Wenn keine Datei existiert → Standardlayout für alle Monitore erstellen
+        monCount := MonitorGetCount()
+        Loop monCount {
+            Layout_Ensure(A_Index)
+        }
         return
-    try {
+    }
+
+    try
         text := FileRead(path, "UTF-8")
-    } catch {
+    catch {
+        MsgBox "Layout_LoadAll(): Fehler beim Lesen der Datei!"
         return
     }
-    try {
+
+    try
         data := jxon_load(&text)
-    } catch {
+    catch {
+        MsgBox "Layout_LoadAll(): Fehler beim Parsen der Layout-JSON!"
         return
     }
-    newLayouts := Map()
+
+    monCount := MonitorGetCount()
+
+    ; Nur Monitore laden, die tatsächlich existieren
     for mon, layout in data {
         monIdx := Layout_ToInt(mon, 1)
+        if (monIdx > monCount)
+            continue  ; Monitor existiert nicht mehr
         nodes := Map()
         if layout.HasOwnProp("nodes") {
             for id, node in layout.nodes {
@@ -342,14 +362,27 @@ Layout_LoadAll() {
                 }
             }
         }
-        newLayouts[monIdx] := {
+        Layouts[monIdx] := {
             root: Layout_ToInt(layout.HasOwnProp("root") ? layout.root : 1, 1),
-            next: Layout_ToInt(layout.HasOwnProp("next") ? layout.next : (nodes.Count+1), nodes.Count+1),
+            next: Layout_ToInt(layout.HasOwnProp("next") ? layout.next : (nodes.Count + 1), nodes.Count + 1),
             nodes: nodes
         }
     }
-    if (newLayouts.Count)
-        Layouts := newLayouts
+
+    ; Sicherstellen, dass alle angeschlossenen Monitore Layouts haben
+    Loop monCount {
+        if !Layouts.Has(A_Index)
+            Layout_Ensure(A_Index)
+    }
+
+    ; Nach dem Laden sicherstellen, dass keine "toten" Monitore existieren
+    count := MonitorGetCount()
+    for mon in Layouts {
+        if (mon > count) {
+            Layouts.Delete(mon)
+        }
+    }
+
 }
 
 Layout_SerializeAll() {
@@ -378,7 +411,8 @@ Layout_SerializeAll() {
 Layout_ToInt(value, default := 0) {
     try {
         return Integer(value)
-    } catch {
+    }
+    catch {
         return default
     }
 }
@@ -386,5 +420,6 @@ Layout_ToInt(value, default := 0) {
 Layout_GetStoragePath() {
     return A_ScriptDir "\WinSnap_layouts.json"
 }
+
 
 Layout_LoadAll()

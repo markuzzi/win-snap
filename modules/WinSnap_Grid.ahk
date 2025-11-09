@@ -395,11 +395,22 @@ DeleteCurrentSnapArea() {
 }
 
 ShowAllSnapAreasHotkey() {
-    ctx := ApplyManualNavigation(GetLeafNavigationContext())
-    if !ctx.mon
-        return
-    ShowAllSnapAreasForMonitor(ctx.mon)
+    global OverlayColor, OverlayDuration
+    count := MonitorGetCount()
+
+    ; Erst alle Layouts sicherstellen (auch wenn JSON mehr Monitore kennt)
+    Loop count {
+        mon := A_Index
+        Layout_Ensure(mon)
+    }
+
+    ; Für alle Monitore die SnapAreas anzeigen
+    Loop count {
+        mon := A_Index
+        ShowAllSnapAreasForMonitor(mon)
+    }
 }
+
 
 CollectWindowsInActiveLeaf() {
     global Layouts

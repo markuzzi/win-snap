@@ -1,72 +1,70 @@
 ; =========================
-; Snap-Area Overlays
+; WinSnap_Overlays.ahk (optimiert, nutzt Utils.GetLeafRectPx)
 ; =========================
-OverlayClear() {
+
+OverlayEnsure() {
     global SnapOverlay
+    if !IsObject(SnapOverlay)
+        SnapOverlay := {}
     if !SnapOverlay.HasOwnProp("edges")
         SnapOverlay.edges := []
+}
+
+OverlayClear() {
+    global SnapOverlay
+    OverlayEnsure()
     for edge in SnapOverlay.edges {
-        try {
-            edge.Destroy()
-        }
+        try edge.Destroy()
     }
     SnapOverlay.edges := []
 }
 
 OverlayAddRect(rect, color, thickness := 0) {
     global SnapOverlay, OverlayOpacity
+    OverlayEnsure()
+
     x := Round(rect.L)
     y := Round(rect.T)
     w := Max(1, Round(rect.R - rect.L))
     h := Max(1, Round(rect.B - rect.T))
+
     try {
-        g := Gui("+AlwaysOnTop -Caption +ToolWindow +E0x20 -DPIScale")
+        style := "+AlwaysOnTop -Caption +ToolWindow +E0x80020 +DPIScale"
+        g := Gui(style)
         g.BackColor := color
-        g.Move(x, y, w, h)
         g.Show("NA")
-        opacity := OverlayOpacity ? OverlayOpacity : 150
-        WinSetTransparent(opacity, g)
+        opacity := (IsSet(OverlayOpacity) && OverlayOpacity) ? OverlayOpacity : 150
+        try WinSetTransparent(opacity, g)
+        g.Move(x, y, w, h)
         SnapOverlay.edges.Push(g)
-    } catch {
-        ; GUI konnte nicht erzeugt werden – ignorieren
+    } catch Error as e {
+        MsgBox "Fehler in OverlayAddRect:`n" e.Message
     }
 }
 
+
 ShowRectOverlay(rectArray, color, duration := 0) {
     OverlayClear()
-    for rect in rectArray
-        OverlayAddRect(rect, color)
+
+    for rect in rectArray {
+        try OverlayAddRect(rect, color)
+    }
+
     if (duration > 0)
-        SetTimer(HideSnapOverlay, -duration)
+        try SetTimer(HideSnapOverlay, -Abs(duration))
 }
 
 HideSnapOverlay(*) {
     OverlayClear()
 }
 
-; erkennt, ob Werte normiert (0–1) oder in Pixeln sind und wandelt um
-NormalizeRect(mon, r) {
-    m := GetMonitorWork(mon)
-    if (r.R <= 1 && r.B <= 1 && r.L >= 0 && r.T >= 0) {
-        mw := m.right - m.left
-        mh := m.bottom - m.top
-        return {
-            L: m.left + (r.L * mw),
-            T: m.top  + (r.T * mh),
-            R: m.left + (r.R * mw),
-            B: m.top  + (r.B * mh)
-        }
-    }
-    return r
-}
-
 FlashLeafOutline(mon, leafId, color := "", duration := 0) {
     global SelectionFlashColor, SelectionFlashDuration
     Layout_Ensure(mon)
-    rect := NormalizeRect(mon, GetLeafRect(mon, leafId))
-    useColor := color ? color : SelectionFlashColor
-    useDuration := duration ? duration : SelectionFlashDuration
-    ShowRectOverlay([rect], useColor, useDuration)
+    r := GetLeafRectPx(mon, leafId)
+    useColor := (color != "") ? color : SelectionFlashColor
+    useDuration := (duration > 0) ? duration : SelectionFlashDuration
+    ShowRectOverlay([r], useColor, useDuration)
 }
 
 ShowAllSnapAreasForMonitor(mon) {
@@ -74,8 +72,8 @@ ShowAllSnapAreasForMonitor(mon) {
     Layout_Ensure(mon)
     rects := Layout_AllLeafRects(mon)
     arr := []
-    for id, rect in rects {
-        r := NormalizeRect(mon, GetLeafRect(mon, id))
+    for id, _ in rects {
+        r := GetLeafRectPx(mon, id)
         arr.Push(r)
     }
     if (arr.Length = 0)

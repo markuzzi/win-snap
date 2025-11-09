@@ -113,6 +113,15 @@ MoveWindow(hwnd, x, y, w, h) {
         if (Abs(cx - x) <= 1 && Abs(cy - y) <= 1 && Abs(cw - w) <= 1 && Abs(ch - h) <= 1)
             done := true
     }
+    if done {
+        try {
+            global WinToLeaf
+            if WinToLeaf.Has(hwnd) {
+                info := WinToLeaf[hwnd]
+                ApplyLeafHighlight(info.mon, info.leaf)
+            }
+        }
+    }
     return done
 }
 
