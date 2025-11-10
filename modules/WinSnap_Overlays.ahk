@@ -19,6 +19,7 @@ OverlayClear() {
         }
     }
     SnapOverlay.edges := []
+    LogDebug("OverlayClear: cleared all edges")
 }
 
 OverlayAddRect(rect, color, thickness := 0) {
@@ -60,10 +61,12 @@ ShowRectOverlay(rectArray, color, duration := 0) {
         try {
             SetTimer(HideSnapOverlay, -Abs(duration))
         }
+    LogInfo(Format("ShowRectOverlay: count={}, color={}, duration={}ms", rectArray.Length, color, duration))
 }
 
 HideSnapOverlay(*) {
     OverlayClear()
+    LogDebug("HideSnapOverlay: hidden")
 }
 
 FlashLeafOutline(mon, leafId, color := "", duration := 0) {
@@ -73,6 +76,7 @@ FlashLeafOutline(mon, leafId, color := "", duration := 0) {
     useColor := (color != "") ? color : SelectionFlashColor
     useDuration := (duration > 0) ? duration : SelectionFlashDuration
     ShowRectOverlay([r], useColor, useDuration)
+    LogInfo(Format("FlashLeafOutline: mon={}, leaf={}, color={}, dur={}ms", mon, leafId, useColor, useDuration))
 }
 
 ShowAllSnapAreasForMonitor(mon) {
@@ -87,4 +91,5 @@ ShowAllSnapAreasForMonitor(mon) {
     if (arr.Length = 0)
         return
     ShowRectOverlay(arr, OverlayColor, OverlayDuration)
+    LogInfo(Format("ShowAllSnapAreasForMonitor: mon={}, count={}", mon, arr.Length))
 }

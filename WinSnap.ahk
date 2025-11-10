@@ -48,6 +48,9 @@ global FrameComp := Map()    ; Klassenname -> {L,T,R,B} Offsets fr Extended Fra
 global FrameCompDebug := true
 global FrameCompLogPath := A_ScriptDir "\WinSnap_frame_debug.log"
 global ActivateOnAreaSwitch := true   ; Beim Snap-Area-Wechsel Fenster fokussieren? (false = nur Auswahl/Highlight)
+global LoggingEnabled := true         ; Logging ein/aus
+global LoggingLevel := 2              ; 0=aus, 1=INFO, 2=DEBUG
+global LoggingPath := FrameCompLogPath ; Pfad zur Logdatei
 
 ; =========================
 ; Module-Includes

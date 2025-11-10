@@ -46,6 +46,7 @@ UnSnapWindow(hwnd) {
 ; >>> GridMove mit Auto-Split & „erstem Snap“
 GridMove(dir) {
     global WinToLeaf, LastDir, Layouts
+    LogInfo(Format("GridMove: dir={}", dir))
     win := GetActiveWindow()
     if (!win)
         return
@@ -65,13 +66,14 @@ GridMove(dir) {
         ; Root ggf. automatisch splitten (damit Win+←/→/↑/↓ sofort snappen)
         if (Layout_IsLeaf(mon, root)) {
             if (dir = "left" || dir = "right")
-                Layout_SplitLeaf(mon, root, "v")
+                Layout_SplitLeaf(mon, root, "v"), LogInfo(Format("GridMove: autosplit root v for mon={} (first snap)", mon))
             else if (dir = "up" || dir = "down")
-                Layout_SplitLeaf(mon, root, "h")
+                Layout_SplitLeaf(mon, root, "h"), LogInfo(Format("GridMove: autosplit root h for mon={} (first snap)", mon))
         }
 
         target := PickLeafForUnsapped(mon, dir, cx, cy)
         SnapToLeaf(hwnd, mon, target)
+        LogInfo(Format("GridMove: snapped hwnd={} to mon={}, leaf={}", hwnd, mon, target))
 
         SetLastDirection(hwnd, dir)
         return
@@ -82,6 +84,7 @@ GridMove(dir) {
     next := FindNeighborLeaf(mon, curLeaf, dir)
     if (next) {
         SnapToLeaf(hwnd, mon, next)
+        LogInfo(Format("GridMove: moved hwnd={} to neighbor leaf {}", hwnd, next))
         SetLastDirection(hwnd, dir)
         return
     }
@@ -103,6 +106,7 @@ GridMove(dir) {
     LeafAttachWindow(hwnd, nextMon, nextLeaf)
     ApplyLeafHighlight(nextMon, nextLeaf)
     SetLastDirection(hwnd, dir)
+    LogInfo(Format("GridMove: moved hwnd={} to neighbor monitor {}, leaf {}", hwnd, nextMon, nextLeaf))
 }
 
 ; Für „erstes Snap“ (wenn noch nicht gesnappt): passende Leaf in Richtung wählen
@@ -258,6 +262,7 @@ AdjustBoundaryForActive(whichArrow) {
 
 SwitchSnapArea(dir) {
     global Layouts, ActivateOnAreaSwitch
+    LogInfo(Format("SwitchSnapArea: dir={} (activateOnSwitch={})", dir, (IsSet(ActivateOnAreaSwitch) && ActivateOnAreaSwitch)))
     ctx := ApplyManualNavigation(GetLeafNavigationContext())
     if (!ctx.mon)
         return
@@ -369,10 +374,12 @@ CycleWindowInLeaf(direction) {
     target := arr[idx]
     if (WinExist("ahk_id " target))
         WinActivate "ahk_id " target
+    LogInfo(Format("CycleWindowInLeaf: direction={}, activated hwnd={}", direction, target))
 }
 
 DeleteCurrentSnapArea() {
     global LeafWindows
+    LogInfo("DeleteCurrentSnapArea: invoked")
     ctx := ApplyManualNavigation(GetLeafNavigationContext())
     if (!ctx.mon || !ctx.leaf)
         return
@@ -407,6 +414,7 @@ DeleteCurrentSnapArea() {
     ReapplySubtree(ctx.mon, siblingId)
     SelectLeaf(ctx.mon, siblingId, "manual")
     FlashLeafOutline(ctx.mon, siblingId)
+    LogInfo(Format("DeleteCurrentSnapArea: removed leaf {}, promoted {}, mon={}", ctx.leaf, siblingId, ctx.mon))
 }
 
 ShowAllSnapAreasHotkey() {
@@ -429,6 +437,7 @@ ShowAllSnapAreasHotkey() {
 
 CollectWindowsInActiveLeaf() {
     global Layouts
+    LogInfo("CollectWindowsInActiveLeaf: start")
     ctx := ApplyManualNavigation(GetLeafNavigationContext())
     if (!ctx.mon)
         return
@@ -460,6 +469,7 @@ CollectWindowsInActiveLeaf() {
         if (top)
             WinActivate "ahk_id " top
     }
+    LogInfo(Format("CollectWindowsInActiveLeaf: collected {} windows into mon={}, leaf={}", collected, ctx.mon, ctx.leaf))
 }
 
 IsCollectibleSnapWindow(hwnd) {

@@ -82,6 +82,7 @@ WindowSearch_Open() {
         WindowSearch.gui.Show()
         WindowSearch.edit.Focus()
     }
+    LogInfo(Format("WindowSearch_Open: mon={}, leaf={}, items={} ", ctx.mon, ctx.leaf, WindowSearch.items.Length))
 }
 
 WindowSearch_Close() {
@@ -92,6 +93,7 @@ WindowSearch_Close() {
         WindowSearch.gui.Hide()
     }
     WindowSearch.active := false
+    LogInfo("WindowSearch_Close")
 }
 
 WindowSearch_OnInput(ctrl, *) {
@@ -112,6 +114,7 @@ WindowSearch_MoveSelection(delta) {
     else if (current > WindowSearch.filtered.Length)
         current := 1
     lb.Value := current
+    LogDebug(Format("WindowSearch_MoveSelection: newIndex={} of {}", current, WindowSearch.filtered.Length))
 }
 
 WindowSearch_Update(term := "") {
@@ -142,6 +145,7 @@ WindowSearch_Update(term := "") {
         list.Add(items)
         list.Value := 1
     }
+    LogDebug(Format("WindowSearch_Update: term='{}', results={}", termLower, filtered.Length))
 }
 
 WindowSearch_Score(termLower, searchText) {
@@ -238,4 +242,5 @@ WindowSearch_Confirm() {
         MoveWindowIntoLeaf(item.hwnd, ctx)
         WinActivate "ahk_id " item.hwnd
     }
+    LogInfo(Format("WindowSearch_Confirm: hwnd={} -> mon={}, leaf={} ", item.hwnd, ctx.mon, ctx.leaf))
 }

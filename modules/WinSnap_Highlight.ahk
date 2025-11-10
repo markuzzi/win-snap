@@ -15,6 +15,7 @@ HL_Init() {
     HL.left  := makeEdge()
     HL.right := makeEdge()
     HL.init := true
+    LogDebug("HL_Init: highlight edges created")
 }
 
 ShowHighlightRect(rect) {
@@ -25,6 +26,7 @@ ShowHighlightRect(rect) {
     x := rect.L, y := rect.T
     w := rect.R - rect.L
     h := rect.B - rect.T
+    LogDebug(Format("ShowHighlightRect: L={},T={},R={},B={} (w={},h={})", rect.L, rect.T, rect.R, rect.B, w, h))
     HL.top.Move(x-1, y-1, w+2, BorderPx),      HL.top.Show("NA")
     HL.bot.Move(x-1, y+h-1, w+2, BorderPx),    HL.bot.Show("NA")
     HL.left.Move(x-1, y-1, BorderPx, h+2),     HL.left.Show("NA")
@@ -48,6 +50,7 @@ HideHighlight() {
         }
     }
     CurrentHighlight := {mon:0, leaf:0}
+    LogDebug("HideHighlight: hidden")
 }
 
 ApplyLeafHighlight(mon, leafId) {
@@ -70,6 +73,7 @@ ApplyLeafHighlight(mon, leafId) {
     rect := ToPixelRect(mon, GetLeafRect(mon, leafId))
     ShowHighlightRect(rect)
     CurrentHighlight := {mon:mon, leaf:leafId}
+    LogInfo(Format("ApplyLeafHighlight: mon={}, leaf={}", mon, leafId))
 }
 
 UpdateActiveHighlight(*) {
@@ -94,6 +98,7 @@ UpdateActiveHighlight(*) {
         monInfo := GetMonitorIndexAndArea(hwnd)
         SelectLeaf(monInfo.index, 0, "auto")
     }
+    LogDebug("UpdateActiveHighlight tick")
 }
 
 UpdateActiveHighlight()

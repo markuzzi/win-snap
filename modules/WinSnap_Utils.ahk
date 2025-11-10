@@ -79,14 +79,33 @@ EnsureRestorable(hwnd) {
     }
 }
 
-DebugLog(msg) {
-    global FrameCompDebug, FrameCompLogPath
-    if (!IsSet(FrameCompDebug) || !FrameCompDebug)
+; --- Logging ---------------------------------------------------------------
+LogWrite(levelNum, levelName, msg) {
+    global LoggingEnabled, LoggingLevel, LoggingPath, FrameCompDebug, FrameCompLogPath
+    enabled := IsSet(LoggingEnabled) ? LoggingEnabled : (IsSet(FrameCompDebug) ? FrameCompDebug : false)
+    if (!enabled)
         return
+    thresh := IsSet(LoggingLevel) ? LoggingLevel : 2
+    if (levelNum > thresh)
+        return
+    path := IsSet(LoggingPath) ? LoggingPath : (IsSet(FrameCompLogPath) ? FrameCompLogPath : A_ScriptDir "\WinSnap.log")
     try {
         stamp := FormatTime(, "yyyy-MM-dd HH:mm:ss")
-        FileAppend(stamp " | " msg "`n", FrameCompLogPath, "UTF-8")
+        FileAppend(stamp " | " levelName " | " msg "`n", path, "UTF-8")
     }
+}
+
+LogInfo(msg) {
+    LogWrite(1, "INFO", msg)
+}
+
+LogDebug(msg) {
+    LogWrite(2, "DEBUG", msg)
+}
+
+; Backward compat
+DebugLog(msg) {
+    LogDebug(msg)
 }
 
 ; Liefert die von DWM gemeldeten Extended Frame Bounds (sichtbare Fensteraussenkanten)

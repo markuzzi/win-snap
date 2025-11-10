@@ -19,6 +19,7 @@ Layout_Ensure(mon) {
     nodes[1] := { id:1, parent:0, split:"", frac:0.5, a:0, b:0 }  ; root unsplittet
     Layouts[mon] := { root:1, next:2, nodes:nodes }
     Layout_SaveAll()
+    LogInfo(Format("Layout_Ensure: initialized layout for monitor {}", mon))
 }
 
 Layout_Node(mon, id) {
@@ -48,6 +49,7 @@ Layout_SplitLeaf(mon, leafId, orient) {
     n := Layouts[mon].nodes[leafId]
     if (n.split != "")
         return
+    LogInfo(Format("Layout_SplitLeaf: mon={}, leaf={}, orient={} -> split", mon, leafId, orient))
     idA := Layouts[mon].next
     idB := idA + 1
     Layouts[mon].next := idB + 1
@@ -186,6 +188,7 @@ Layout_RemoveLeaf(mon, leafId) {
     nodes := Layouts[mon].nodes
     if (!nodes.Has(leafId))
         return 0
+    LogInfo(Format("Layout_RemoveLeaf: mon={}, leaf={} -> remove", mon, leafId))
     leaf := nodes[leafId]
     if (leaf.parent = 0)
         return 0
@@ -213,6 +216,7 @@ Layout_RemoveLeaf(mon, leafId) {
     nodes[siblingId] := sibling
     Layouts[mon].nodes := nodes
     Layout_SaveAll()
+    LogInfo(Format("Layout_RemoveLeaf: mon={}, leaf={} -> promoted {}", mon, leafId, siblingId))
     return siblingId
 }
 
@@ -293,6 +297,7 @@ ReapplySubtree(mon, nodeId) {
             MoveWindow(hwnd, r.L, r.T, r.R - r.L, r.B - r.T)
         }
     }
+    LogDebug(Format("ReapplySubtree: mon={}, node={}, leaves={} windows reapplied", mon, nodeId, leaves.Length))
 }
 
 ; =========================
@@ -311,6 +316,7 @@ Layout_SaveAll() {
     } catch {
         MsgBox "Layout_SaveAll(): Fehler beim Schreiben der Layout-Datei!"
     }
+    LogInfo(Format("Layout_SaveAll: saved to {}", path))
 }
 
 Layout_LoadAll() {
@@ -324,6 +330,7 @@ Layout_LoadAll() {
         Loop monCount {
             Layout_Ensure(A_Index)
         }
+        LogInfo("Layout_LoadAll: no file found, initialized defaults")
         return
     }
 
@@ -331,6 +338,7 @@ Layout_LoadAll() {
         text := FileRead(path, "UTF-8")
     } catch {
         MsgBox "Layout_LoadAll(): Fehler beim Lesen der Datei!"
+        LogInfo("Layout_LoadAll: read failed")
         return
     }
 
@@ -338,6 +346,7 @@ Layout_LoadAll() {
         data := jxon_load(&text)
     } catch {
         MsgBox "Layout_LoadAll(): Fehler beim Parsen der Layout-JSON!"
+        LogInfo("Layout_LoadAll: parse failed")
         return
     }
 
@@ -383,6 +392,7 @@ Layout_LoadAll() {
         }
     }
 
+    LogInfo(Format("Layout_LoadAll: loaded layouts for {} monitors", Layouts.Count))
 }
 
 Layout_SerializeAll() {
@@ -449,6 +459,7 @@ SaveLeafAssignment(mon, leafId, hwnd) {
     assignments.Push({leaf:leafId, exe:exe, title:title})
 
     Layout_SaveAll()
+    LogInfo(Format("SaveLeafAssignment: mon={}, leaf={}, exe={}, title={} -> saved", mon, leafId, exe, title))
 }
 
 AutoSnap_AssignedWindows() {
@@ -471,8 +482,10 @@ AutoSnap_AssignedWindows() {
                     if (winExe = entry.exe && winTitle = entry.title) {
                         r := GetLeafRect(mon, entry.leaf)
                         WinGetPos &x, &y, &w, &h, "ahk_id " hwnd
-                        if (Abs(r.L - x) > 5 || Abs(r.T - y) > 5)
+                        if (Abs(r.L - x) > 5 || Abs(r.T - y) > 5) {
                             LeafAttachWindow(hwnd, mon, entry.leaf, false)
+                            LogInfo(Format("AutoSnap_AssignedWindows: attach hwnd={} to mon={}, leaf={}", hwnd, mon, entry.leaf))
+                        }
                         break
                     }
                 }
@@ -523,6 +536,7 @@ SnapWindowToLeaf(hwnd, mon, leafId) {
     MoveWindow(hwnd, rect.L, rect.T, rect.R - rect.L, rect.B - rect.T)
     ; Beim AutoSnap nicht die Auswahl/Highlight ändern
     LeafAttachWindow(hwnd, mon, leafId, false)
+    LogInfo(Format("SnapWindowToLeaf: hwnd={} -> mon={}, leaf={}", hwnd, mon, leafId))
 }
 
 

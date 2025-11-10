@@ -29,6 +29,7 @@ LeafCleanupList(key) {
 
 LeafAttachWindow(hwnd, mon, leafId, updateSelection := true) {
     global LeafWindows, WinToLeaf
+    LogInfo(Format("LeafAttachWindow: hwnd={}, mon={}, leaf={}, updateSel={}", hwnd, mon, leafId, updateSelection))
     LeafDetachWindow(hwnd, false)
     key := LeafKey(mon, leafId)
     if (!LeafWindows.Has(key))
@@ -64,6 +65,7 @@ LeafDetachWindow(hwnd, removeMapping := false) {
     global LeafWindows, WinToLeaf
     if (!WinToLeaf.Has(hwnd))
         return
+    LogInfo(Format("LeafDetachWindow: hwnd={}, removeMapping={} ", hwnd, removeMapping))
     info := WinToLeaf[hwnd]
     key := LeafKey(info.mon, info.leaf)
     if (LeafWindows.Has(key)) {
@@ -110,8 +112,10 @@ LeafGetTopWindow(mon, leafId) {
         }
     }
 
-    if (top)
+    if (top) {
+        LogDebug(Format("LeafGetTopWindow: mon={}, leaf={} -> top={} (z-order)", mon, leafId, top))
         return top
+    }
 
     ; Fallback: Liste bereinigen und erstes gültiges nehmen
     idx := 1
@@ -128,6 +132,7 @@ LeafGetTopWindow(mon, leafId) {
     }
     if (arr.Length = 0)
         LeafWindows.Delete(key)
+    LogDebug(Format("LeafGetTopWindow: mon={}, leaf={} -> no valid hwnd", mon, leafId))
     return 0
 }
 
