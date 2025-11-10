@@ -46,10 +46,10 @@ global SelectionFlashColor := "Teal"
 global WindowSearch := {gui:"", edit:"", list:"", items:[], filtered:[], ctx:{}, active:false}
 global FrameComp := Map()    ; Klassenname -> {L,T,R,B} Offsets fr Extended Frame Bounds-Kompensation
 global FrameCompDebug := true
-global FrameCompLogPath := A_ScriptDir "\WinSnap_frame_debug.log"
+global FrameCompLogPath := A_ScriptDir "\WinSnap.log"
 global ActivateOnAreaSwitch := true   ; Beim Snap-Area-Wechsel Fenster fokussieren? (false = nur Auswahl/Highlight)
 global LoggingEnabled := true         ; Logging ein/aus
-global LoggingLevel := 2              ; 0=aus, 1=INFO, 2=DEBUG
+global LoggingLevel := 1              ; 0=aus, 1=INFO, 2=DEBUG
 global LoggingPath := FrameCompLogPath ; Pfad zur Logdatei
 
 ; =========================
