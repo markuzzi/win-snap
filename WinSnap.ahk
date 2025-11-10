@@ -14,7 +14,7 @@ global DefaultSplitY := 0.50      ; Default horizontal (oben/unten)
 global SplitStep     := 0.05      ; Schrittweite für Alt+Shift+Pfeile
 global MinFrac       := 0.15
 global MaxFrac       := 0.85
-global SnapGap       := 12        ; Abstand zwischen Snap-Areas (Pixel gesamt)
+global SnapGap       := 24        ; Abstand zwischen Snap-Areas (Pixel gesamt)
 
 global HighlightEnabled := true    ; roten Rahmen anzeigen?
 global BorderPx         := 3
@@ -228,6 +228,71 @@ TogglePause() {
     UpdateTrayTooltip()
 }
 
+; =========================
+; Layout Preset Hotkeys (pro aktueller Monitor)
+; =========================
+
+; Helper to get current monitor index
+GetCurrentMonitorIndex() {
+    win := GetActiveWindow()
+    if (win) {
+        mi := GetMonitorIndexAndArea(win.hwnd)
+        return mi.index
+    }
+    return 1
+}
+
+; Alt+Ctrl+Win+1: Fullscreen (ein Leaf)
+^#!1:: {
+    mon := GetCurrentMonitorIndex()
+    Layout_ResetMonitor(mon)
+    LogInfo(Format("Preset: Fullscreen on mon={}", mon))
+}
+
+; Alt+Ctrl+Win+2: 50/50 vertikal
+^#!2:: {
+    mon := GetCurrentMonitorIndex()
+    Layout_SetMonitorColumns(mon, [1, 1])
+    LogInfo(Format("Preset: 50/50 on mon={}", mon))
+}
+
+; Alt+Ctrl+Win+3: 33/33/33 vertikal
+^#!3:: {
+    mon := GetCurrentMonitorIndex()
+    Layout_SetMonitorColumns(mon, [1, 1, 1])
+    LogInfo(Format("Preset: 33/33/33 on mon={}", mon))
+}
+
+; Alt+Ctrl+Win+4: 2x2 Quadranten
+^#!4:: {
+    mon := GetCurrentMonitorIndex()
+    Layout_SetMonitorQuadrants(mon)
+    LogInfo(Format("Preset: Quadrants on mon={}", mon))
+}
+
+; Alt+Ctrl+Win+5: 25/50/25 vertikal
+^#!5:: {
+    mon := GetCurrentMonitorIndex()
+    Layout_SetMonitorColumns(mon, [1, 2, 1])
+    LogInfo(Format("Preset: 25/50/25 on mon={}", mon))
+}
+
+; Alt+Ctrl+Win+6: 70/30 vertikal
+^#!6:: {
+    mon := GetCurrentMonitorIndex()
+    Layout_SetMonitorColumns(mon, [7, 3])
+    LogInfo(Format("Preset: 70/30 on mon={}", mon))
+}
+
+; Alt+Ctrl+Win+0: alle Monitore 50/50
+^#!0:: {
+    count := MonitorGetCount()
+    Loop count {
+        Layout_SetMonitorColumns(A_Index, [1, 1])
+    }
+    LogInfo("Preset: 50/50 on all monitors")
+}
+
 ; --------------------
 ; Tray Icon utilities
 ; --------------------
@@ -250,4 +315,3 @@ UpdateTrayTooltip() {
     tip := ScriptPaused ? "WinSnap — Pausiert" : "WinSnap — Aktiv"
     try A_IconTip := tip
 }
-

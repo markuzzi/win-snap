@@ -399,6 +399,8 @@ Layout_SerializeAll() {
     global Layouts
     data := Map()
     for mon, layout in Layouts {
+        if (!IsObject(layout) || !layout.HasOwnProp("nodes") || !IsObject(layout.nodes))
+            continue
         nodes := Map()
         for id, node in layout.nodes {
             nodeMap := Map()
@@ -465,7 +467,7 @@ SaveLeafAssignment(mon, leafId, hwnd) {
 AutoSnap_AssignedWindows() {
     global Layouts
     for mon, layout in Layouts {
-        if (!layout.HasOwnProp("assignments"))
+        if (!IsObject(layout) || !layout.HasOwnProp("assignments"))
             continue
 
         for entry in layout.assignments {
@@ -512,7 +514,7 @@ FindWindow(exe, title := "") {
 AutoSnap_NewlyStartedWindows() {
     global Layouts
     for mon, layout in Layouts {
-        if (!layout.HasOwnProp("assignments"))
+        if (!IsObject(layout) || !layout.HasOwnProp("assignments"))
             continue
 
         for entry in layout.assignments {
@@ -549,3 +551,92 @@ SetTimer(AutoSnap_AssignedWindows, -100)
 ; Prüft regelmäßig auf neue Fenster, die einsortiert werden sollen
 SetTimer(AutoSnap_NewlyStartedWindows, 2000)
 
+
+; =========================
+; Layout Presets (per monitor)
+; =========================
+
+Layout_ClearMonitorState(mon) {
+    global LeafWindows, WinToLeaf, CurrentLeafSelection
+    delKeys := []
+    for key in LeafWindows {
+        try {
+            parts := StrSplit(key, ":")
+            if (parts.Length >= 1 && Integer(parts[1]) = mon)
+                delKeys.Push(key)
+        }
+    }
+    for k in delKeys
+        LeafWindows.Delete(k)
+    delHwnd := []
+    for hwnd, info in WinToLeaf {
+        if (info.mon = mon)
+            delHwnd.Push(hwnd)
+    }
+    for h in delHwnd
+        WinToLeaf.Delete(h)
+    try {
+        if (CurrentLeafSelection.Has(mon))
+            CurrentLeafSelection.Delete(mon)
+    }
+}
+
+Layout_ResetMonitor(mon) {
+    global Layouts
+    if (Layouts.Has(mon))
+        Layouts.Delete(mon)
+    Layout_Ensure(mon)
+    Layout_ClearMonitorState(mon)
+    LogInfo(Format("Layout_ResetMonitor: mon={}", mon))
+}
+
+Layout_SetMonitorColumns(mon, fracs) {
+    global Layouts
+    if !(fracs is Array)
+        return
+    Layout_ResetMonitor(mon)
+    root := Layouts[mon].root
+    total := 0.0
+    for v in fracs
+        total += v
+    if (total <= 0)
+        total := 1.0
+    remaining := total
+    curLeaf := root
+    i := 1
+    while (i <= fracs.Length - 1) {
+        share := fracs[i] / remaining
+        Layout_SplitLeaf(mon, curLeaf, "v")
+        n := Layouts[mon].nodes[curLeaf]
+        n.frac := ClampFrac(share)
+        Layouts[mon].nodes[curLeaf] := n
+        nextLeaf := n.b
+        remaining -= fracs[i]
+        curLeaf := nextLeaf
+        i += 1
+    }
+    Layout_SaveAll()
+    LogInfo(Format("Layout_SetMonitorColumns: mon={}, cols={}", mon, fracs.Length))
+}
+
+Layout_SetMonitorQuadrants(mon) {
+    global Layouts
+    Layout_ResetMonitor(mon)
+    root := Layouts[mon].root
+    Layout_SplitLeaf(mon, root, "h")
+    nr := Layouts[mon].nodes[root]
+    nr.frac := ClampFrac(0.5)
+    Layouts[mon].nodes[root] := nr
+    top := nr.a
+    Layout_SplitLeaf(mon, top, "v")
+    nt := Layouts[mon].nodes[top]
+    nt.frac := ClampFrac(0.5)
+    Layouts[mon].nodes[top] := nt
+    bottom := nr.b
+    Layout_SplitLeaf(mon, bottom, "v")
+    nb := Layouts[mon].nodes[bottom]
+    nb.frac := ClampFrac(0.5)
+    Layouts[mon].nodes[bottom] := nb
+    Layout_SaveAll()
+    LogInfo(Format("Layout_SetMonitorQuadrants: mon={}", mon))
+}

@@ -1,4 +1,4 @@
-; =========================
+﻿; =========================
 ; Snap / UnSnap / Grid-Navigation
 ; =========================
 
@@ -43,7 +43,7 @@ UnSnapWindow(hwnd) {
     }
 }
 
-; >>> GridMove mit Auto-Split & „erstem Snap“
+; >>> GridMove mit Auto-Split & "erstem Snap"
 GridMove(dir) {
     global WinToLeaf, LastDir, Layouts
     LogInfo(Format("GridMove: dir={}", dir))
@@ -63,7 +63,7 @@ GridMove(dir) {
     if (!WinToLeaf.Has(hwnd)) {
         EnsureHistory(hwnd)
 
-        ; Root ggf. automatisch splitten (damit Win+←/→/↑/↓ sofort snappen)
+        ; Root ggf. automatisch splitten (damit Win+â†/->/â†‘/â†“ sofort snappen)
         if (Layout_IsLeaf(mon, root)) {
             if (dir = "left" || dir = "right")
                 Layout_SplitLeaf(mon, root, "v"), LogInfo(Format("GridMove: autosplit root v for mon={} (first snap)", mon))
@@ -79,7 +79,7 @@ GridMove(dir) {
         return
     }
 
-    ; --- Fenster ist gesnappt → Nachbar suchen ---
+    ; --- Fenster ist gesnappt -> Nachbar suchen ---
     curLeaf := WinToLeaf[hwnd].leaf
     next := FindNeighborLeaf(mon, curLeaf, dir)
     if (next) {
@@ -89,7 +89,7 @@ GridMove(dir) {
         return
     }
 
-    ; --- Kein Nachbar-Leaf → versuche Nachbar-Monitor ---
+    ; --- Kein Nachbar-Leaf -> versuche Nachbar-Monitor ---
     nextMon := FindNeighborMonitor(mon, dir)
     if (!nextMon)
         return
@@ -109,7 +109,7 @@ GridMove(dir) {
     LogInfo(Format("GridMove: moved hwnd={} to neighbor monitor {}, leaf {}", hwnd, nextMon, nextLeaf))
 }
 
-; Für „erstes Snap“ (wenn noch nicht gesnappt): passende Leaf in Richtung wählen
+; Für "erstes Snap" (wenn noch nicht gesnappt): passende Leaf in Richtung wählen
 PickLeafForUnsapped(mon, dir, cx, cy) {
     Layout_Ensure(mon)
     rects := Layout_AllLeafRects(mon)
@@ -420,18 +420,21 @@ DeleteCurrentSnapArea() {
 ShowAllSnapAreasHotkey() {
     global OverlayColor, OverlayDuration
     count := MonitorGetCount()
-
-    ; Erst alle Layouts sicherstellen (auch wenn JSON mehr Monitore kennt)
     Loop count {
         mon := A_Index
         Layout_Ensure(mon)
     }
-
-    ; Für alle Monitore die SnapAreas anzeigen
+    arr := []
     Loop count {
         mon := A_Index
-        ShowAllSnapAreasForMonitor(mon)
+        rects := Layout_AllLeafRects(mon)
+        for id, _ in rects {
+            r := GetLeafRectPx(mon, id)
+            arr.Push(r)
+        }
     }
+    if (arr.Length)
+        ShowRectOverlay(arr, OverlayColor, OverlayDuration)
 }
 
 
@@ -534,3 +537,4 @@ SetLastDirection(hwnd, dir) {
     else if (dir = "down")
         LastDir[hwnd] := "bottom"
 }
+
