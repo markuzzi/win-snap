@@ -27,7 +27,7 @@ LeafCleanupList(key) {
         LeafWindows.Delete(key)
 }
 
-LeafAttachWindow(hwnd, mon, leafId) {
+LeafAttachWindow(hwnd, mon, leafId, updateSelection := true) {
     global LeafWindows, WinToLeaf
     LeafDetachWindow(hwnd, false)
     key := LeafKey(mon, leafId)
@@ -48,7 +48,8 @@ LeafAttachWindow(hwnd, mon, leafId) {
     }
     arr.InsertAt(1, hwnd)
     WinToLeaf[hwnd] := { mon:mon, leaf:leafId }
-    SelectLeaf(mon, leafId, "auto")
+    if (updateSelection)
+        SelectLeaf(mon, leafId, "auto")
 
     try {
         SaveLeafAssignment(mon, leafId, hwnd)

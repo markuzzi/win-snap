@@ -472,7 +472,7 @@ AutoSnap_AssignedWindows() {
                         r := GetLeafRect(mon, entry.leaf)
                         WinGetPos &x, &y, &w, &h, "ahk_id " hwnd
                         if (Abs(r.L - x) > 5 || Abs(r.T - y) > 5)
-                            LeafAttachWindow(hwnd, mon, entry.leaf)
+                            LeafAttachWindow(hwnd, mon, entry.leaf, false)
                         break
                     }
                 }
@@ -521,7 +521,8 @@ AutoSnap_NewlyStartedWindows() {
 SnapWindowToLeaf(hwnd, mon, leafId) {
     rect := GetLeafRect(mon, leafId)
     MoveWindow(hwnd, rect.L, rect.T, rect.R - rect.L, rect.B - rect.T)
-    LeafAttachWindow(hwnd, mon, leafId)
+    ; Beim AutoSnap nicht die Auswahl/Highlight ändern
+    LeafAttachWindow(hwnd, mon, leafId, false)
 }
 
 
