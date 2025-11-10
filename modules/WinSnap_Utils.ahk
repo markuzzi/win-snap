@@ -79,50 +79,103 @@ EnsureRestorable(hwnd) {
     }
 }
 
+; Liefert die von DWM gemeldeten Extended Frame Bounds (sichtbare Fensteraussenkanten)
+GetExtendedFrameBounds(hwnd) {
+    try {
+        buf := Buffer(16, 0)
+        hr := DllCall("DwmGetWindowAttribute", "ptr", hwnd, "int", 9, "ptr", buf.Ptr, "uint", 16, "int")
+        if (hr != 0)
+            return 0
+        l := NumGet(buf, 0, "Int")
+        t := NumGet(buf, 4, "Int")
+        r := NumGet(buf, 8, "Int")
+        b := NumGet(buf, 12, "Int")
+        return { L:l, T:t, R:r, B:b }
+    } catch {
+        return 0
+    }
+}
+
 MoveWindow(hwnd, x, y, w, h) {
     try {
         exists := DllCall("IsWindow", "ptr", hwnd) && WinExist("ahk_id " hwnd)
-    }
-    catch {
+    } catch {
         exists := false
     }
     if (!exists)
         return false
+
     EnsureRestorable(hwnd)
+
+    ; Zielrechteck runden und validieren
     x := Round(x)
     y := Round(y)
     w := Max(1, Round(w))
     h := Max(1, Round(h))
-    attempts := 0
-    done := false
-    while (attempts < 3 && !done) {
-        attempts += 1
-        try {
-            WinMove x, y, w, h, "ahk_id " hwnd
-        }
-        catch {
-            return false
-        }
-        Sleep 15
-        try {
-            WinGetPos &cx, &cy, &cw, &ch, "ahk_id " hwnd
-        }
-        catch {
-            break
-        }
-        if (Abs(cx - x) <= 1 && Abs(cy - y) <= 1 && Abs(cw - w) <= 1 && Abs(ch - h) <= 1)
-            done := true
+
+    ; Klassenbasierte Kompensation anwenden (falls vorhanden)
+    x0 := x, y0 := y, w0 := w, h0 := h
+    className := ""
+    try {
+        className := WinGetClass("ahk_id " hwnd)
     }
-    if (done) {
-        try {
-            global WinToLeaf
-            if (WinToLeaf.Has(hwnd)) {
-                info := WinToLeaf[hwnd]
-                ApplyLeafHighlight(info.mon, info.leaf)
+
+    try {
+        global FrameComp
+        if (FrameComp.Has(className)) {
+            off := FrameComp[className]
+            if (off) {
+                x0 := x - off.L
+                y0 := y - off.T
+                w0 := w + off.L + off.R
+                h0 := h + off.T + off.B
             }
         }
     }
-    return done
+
+    ; Erster Move (ggf. bereits kompensiert)
+    try {
+        WinMove x0, y0, w0, h0, "ahk_id " hwnd
+    } catch {
+        return false
+    }
+    Sleep 15
+
+    ; Extended Frame Bounds ermitteln und ggf. korrigieren
+    efb := GetExtendedFrameBounds(hwnd)
+    if (efb) {
+        dxL := Max(0, efb.L - x)
+        dxT := Max(0, efb.T - y)
+        dxR := Max(0, (x + w) - efb.R)
+        dxB := Max(0, (y + h) - efb.B)
+        if (dxL || dxT || dxR || dxB) {
+            x1 := x - dxL
+            y1 := y - dxT
+            w1 := w + dxL + dxR
+            h1 := h + dxT + dxB
+            try {
+                WinMove x1, y1, w1, h1, "ahk_id " hwnd
+            }
+            Sleep 10
+            try {
+                ; Cache pro Klassenname ablegen
+                if (className != "") {
+                    FrameComp[className] := { L:dxL, T:dxT, R:dxR, B:dxB }
+                }
+            }
+        }
+    }
+
+    ; Highlight reaktivieren, falls bekanntem Leaf zugeordnet
+    try {
+        global WinToLeaf
+        if (WinToLeaf.Has(hwnd)) {
+            info := WinToLeaf[hwnd]
+            ApplyLeafHighlight(info.mon, info.leaf)
+        }
+    }
+
+    return true
 }
 
 ; --- Hilfsfunktionen: Normierte Rechtecke → Pixelkoordinaten ---
