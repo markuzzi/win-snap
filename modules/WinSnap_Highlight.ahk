@@ -19,7 +19,7 @@ HL_Init() {
 
 ShowHighlightRect(rect) {
     global HighlightEnabled, HL, BorderPx
-    if !HighlightEnabled
+    if (!HighlightEnabled)
         return
     HL_Init()
     x := rect.L, y := rect.T
@@ -33,7 +33,7 @@ ShowHighlightRect(rect) {
 
 HideHighlight() {
     global HL, CurrentHighlight
-    if HL.init {
+    if (HL.init) {
         try {
             HL.top.Hide()
         }
@@ -52,7 +52,7 @@ HideHighlight() {
 
 ApplyLeafHighlight(mon, leafId) {
     global HighlightEnabled, CurrentHighlight, Layouts, CurrentLeafSelection
-    if !HighlightEnabled {
+    if (!HighlightEnabled) {
         HideHighlight()
         return
     }
@@ -61,8 +61,8 @@ ApplyLeafHighlight(mon, leafId) {
         return
     }
     Layout_Ensure(mon)
-    if !Layouts[mon].nodes.Has(leafId) {
-        if CurrentLeafSelection.Has(mon)
+    if (!Layouts[mon].nodes.Has(leafId)) {
+        if (CurrentLeafSelection.Has(mon))
             CurrentLeafSelection.Delete(mon)
         HideHighlight()
         return
@@ -75,20 +75,20 @@ ApplyLeafHighlight(mon, leafId) {
 UpdateActiveHighlight(*) {
     global WinToLeaf, WindowSearch
     manual := GetManualNavigationContext()
-    if manual.mon {
+    if (manual.mon) {
         ApplyLeafHighlight(manual.mon, manual.leaf)
         return
     }
-    if WindowSearch.active
+    if (WindowSearch.active)
         return
     try {
         hwnd := WinGetID("A")
     } catch {
         hwnd := 0
     }
-    if !hwnd || !DllCall("IsWindow", "ptr", hwnd) || !WinExist("ahk_id " hwnd)
+    if (!hwnd || !DllCall("IsWindow", "ptr", hwnd) || !WinExist("ahk_id " hwnd))
         return
-    if WinToLeaf.Has(hwnd)
+    if (WinToLeaf.Has(hwnd))
         LeafRecordActivation(hwnd)
     else {
         monInfo := GetMonitorIndexAndArea(hwnd)

@@ -4,17 +4,17 @@
 LeafHasWindows(mon, leafId) {
     global LeafWindows
     key := LeafKey(mon, leafId)
-    if !LeafWindows.Has(key)
+    if (!LeafWindows.Has(key))
         return false
     LeafCleanupList(key)
-    if !LeafWindows.Has(key)
+    if (!LeafWindows.Has(key))
         return false
     return LeafWindows[key].Length > 0
 }
 
 SelectLeaf(mon, leafId, source := "manual") {
     global CurrentLeafSelection, CurrentHighlight
-    if !mon {
+    if (!mon) {
         if (source = "manual")
             ManualNav_Clear()
         HideHighlight()
@@ -24,7 +24,7 @@ SelectLeaf(mon, leafId, source := "manual") {
     if (!leafId) {
         if (source = "auto" && state.source = "manual" && state.leaf && !LeafHasWindows(mon, state.leaf))
             return
-        if CurrentLeafSelection.Has(mon)
+        if (CurrentLeafSelection.Has(mon))
             CurrentLeafSelection.Delete(mon)
         if (CurrentHighlight.mon = mon)
             HideHighlight()
@@ -43,20 +43,20 @@ SelectLeaf(mon, leafId, source := "manual") {
 
 GetSelectedLeaf(mon) {
     global CurrentLeafSelection
-    if CurrentLeafSelection.Has(mon)
+    if (CurrentLeafSelection.Has(mon))
         return CurrentLeafSelection[mon].leaf
     return 0
 }
 
 LeafRecordActivation(hwnd) {
     global LeafWindows, WinToLeaf
-    if !WinToLeaf.Has(hwnd)
+    if (!WinToLeaf.Has(hwnd))
         return
     info := WinToLeaf[hwnd]
     key := LeafKey(info.mon, info.leaf)
-    if LeafWindows.Has(key)
+    if (LeafWindows.Has(key))
         LeafCleanupList(key)
-    if !LeafWindows.Has(key)
+    if (!LeafWindows.Has(key))
         LeafWindows[key] := []
     arr := LeafWindows[key]
     idx := 1
@@ -71,7 +71,7 @@ LeafRecordActivation(hwnd) {
             arr.RemoveAt(idx)
             break
         }
-        if !exists
+        if (!exists)
             arr.RemoveAt(idx)
         else
             idx++
@@ -83,9 +83,9 @@ LeafRecordActivation(hwnd) {
 GetLeafNavigationContext() {
     global CurrentLeafSelection, WinToLeaf, Layouts
     win := GetActiveWindow()
-    if win {
+    if (win) {
         hwnd := win.hwnd
-        if WinToLeaf.Has(hwnd) {
+        if (WinToLeaf.Has(hwnd)) {
             info := WinToLeaf[hwnd]
             return { mon:info.mon, leaf:info.leaf, hwnd:hwnd }
         }
@@ -95,7 +95,7 @@ GetLeafNavigationContext() {
         cx := win.x + win.w / 2
         cy := win.y + win.h / 2
         leaf := GetSelectedLeaf(mon)
-        if !leaf
+        if (!leaf)
             leaf := Layout_FindLeafAtPoint(mon, cx, cy)
         return { mon:mon, leaf:leaf, hwnd:hwnd }
     }
@@ -104,7 +104,7 @@ GetLeafNavigationContext() {
     mon := 1
     Layout_Ensure(mon)
     leaf := GetSelectedLeaf(mon)
-    if !leaf
+    if (!leaf)
         leaf := Layouts[mon].root
     return { mon:mon, leaf:leaf, hwnd:0 }
 }
@@ -113,7 +113,7 @@ GetManualNavigationContext() {
     global ManualNav, Layouts
     if (ManualNav.mon && ManualNav.leaf) {
         Layout_Ensure(ManualNav.mon)
-        if Layouts[ManualNav.mon].nodes.Has(ManualNav.leaf)
+        if (Layouts[ManualNav.mon].nodes.Has(ManualNav.leaf))
             return { mon:ManualNav.mon, leaf:ManualNav.leaf }
         ManualNav_Clear()
     }
@@ -122,7 +122,7 @@ GetManualNavigationContext() {
 
 ApplyManualNavigation(ctx) {
     nav := GetManualNavigationContext()
-    if nav.mon {
+    if (nav.mon) {
         ctx.mon := nav.mon
         ctx.leaf := nav.leaf
     }

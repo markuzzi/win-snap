@@ -3,7 +3,7 @@
 ; =========================
 InitWindowSearchGui() {
     global WindowSearch
-    if WindowSearch.gui
+    if (WindowSearch.gui)
         return
     g := Gui("+AlwaysOnTop -Caption +ToolWindow +Border")
     g.MarginX := 12
@@ -28,7 +28,7 @@ BuildWindowCandidateList() {
     for hwnd in ids {
         if (hwnd = exclusion)
             continue
-        if !DllCall("IsWindow", "ptr", hwnd) || !WinExist("ahk_id " hwnd)
+        if (!DllCall("IsWindow", "ptr", hwnd) || !WinExist("ahk_id " hwnd))
             continue
         title := Trim(WinGetTitle("ahk_id " hwnd))
         className := ""
@@ -53,12 +53,12 @@ BuildWindowCandidateList() {
 
 WindowSearch_Open() {
     global WindowSearch
-    if WindowSearch.active {
+    if (WindowSearch.active) {
         WindowSearch_Close()
         return
     }
     ctx := ApplyManualNavigation(GetLeafNavigationContext())
-    if !ctx.mon || !ctx.leaf
+    if (!ctx.mon || !ctx.leaf)
         return
     InitWindowSearchGui()
     WindowSearch.ctx := ctx
@@ -86,7 +86,7 @@ WindowSearch_Open() {
 
 WindowSearch_Close() {
     global WindowSearch
-    if !WindowSearch.gui
+    if (!WindowSearch.gui)
         return
     try {
         WindowSearch.gui.Hide()
@@ -116,7 +116,7 @@ WindowSearch_MoveSelection(delta) {
 
 WindowSearch_Update(term := "") {
     global WindowSearch
-    if !WindowSearch.gui
+    if (!WindowSearch.gui)
         return
     termLower := StrLower(Trim(term))
     list := WindowSearch.list
@@ -155,7 +155,7 @@ WindowSearch_Score(termLower, searchText) {
     Loop Parse termLower {
         ch := A_LoopField
         found := InStr(SubStr(searchText, idx), ch)
-        if !found
+        if (!found)
             return -10000
         score -= (found - 1) + (idx - 1)
         idx += found
@@ -187,7 +187,7 @@ WindowSearch_CompareTitle(a, b, *) {
 }
 
 ArraySort(arr, compareFn := "") {
-    if !(arr is Array)
+    if (!(arr is Array))
         throw Error("ArraySort() erwartet ein Array.")
     if (arr.Length < 2)
         return arr.Clone()
@@ -216,7 +216,7 @@ ArraySort(arr, compareFn := "") {
 
 
 WindowSearch_ItemTitle(item) {
-    if IsObject(item) && item.HasOwnProp("title")
+    if (IsObject(item) && item.HasOwnProp("title"))
         return item.title
     return String(item)
 }
@@ -230,10 +230,10 @@ WindowSearch_Confirm() {
         idx := 1
     item := WindowSearch.filtered[idx]
     ctx := WindowSearch.ctx
-    if !ctx.mon || !ctx.leaf
+    if (!ctx.mon || !ctx.leaf)
         return
     WindowSearch_Close()
-    if WinExist("ahk_id " item.hwnd) {
+    if (WinExist("ahk_id " item.hwnd)) {
         SelectLeaf(ctx.mon, ctx.leaf, "manual")
         MoveWindowIntoLeaf(item.hwnd, ctx)
         WinActivate "ahk_id " item.hwnd

@@ -7,7 +7,7 @@ LeafKey(mon, leafId) {
 
 LeafCleanupList(key) {
     global LeafWindows
-    if !LeafWindows.Has(key)
+    if (!LeafWindows.Has(key))
         return
     arr := LeafWindows[key]
     idx := 1
@@ -18,7 +18,7 @@ LeafCleanupList(key) {
         } catch {
             exists := false
         }
-        if !exists
+        if (!exists)
             arr.RemoveAt(idx)
         else
             idx++
@@ -31,11 +31,11 @@ LeafAttachWindow(hwnd, mon, leafId) {
     global LeafWindows, WinToLeaf
     LeafDetachWindow(hwnd, false)
     key := LeafKey(mon, leafId)
-    if !LeafWindows.Has(key)
+    if (!LeafWindows.Has(key))
         LeafWindows[key] := []
     else
         LeafCleanupList(key)
-    if !LeafWindows.Has(key)
+    if (!LeafWindows.Has(key))
         LeafWindows[key] := []
     arr := LeafWindows[key]
     idx := 1
@@ -61,11 +61,11 @@ LeafAttachWindow(hwnd, mon, leafId) {
 
 LeafDetachWindow(hwnd, removeMapping := false) {
     global LeafWindows, WinToLeaf
-    if !WinToLeaf.Has(hwnd)
+    if (!WinToLeaf.Has(hwnd))
         return
     info := WinToLeaf[hwnd]
     key := LeafKey(info.mon, info.leaf)
-    if LeafWindows.Has(key) {
+    if (LeafWindows.Has(key)) {
         arr := LeafWindows[key]
         idx := 1
         while (idx <= arr.Length) {
@@ -78,14 +78,14 @@ LeafDetachWindow(hwnd, removeMapping := false) {
         if (arr.Length = 0)
             LeafWindows.Delete(key)
     }
-    if removeMapping
+    if (removeMapping)
         WinToLeaf.Delete(hwnd)
 }
 
 LeafGetTopWindow(mon, leafId) {
     global LeafWindows
     key := LeafKey(mon, leafId)
-    if !LeafWindows.Has(key)
+    if (!LeafWindows.Has(key))
         return 0
     arr := LeafWindows[key]
     idx := 1
@@ -96,7 +96,7 @@ LeafGetTopWindow(mon, leafId) {
         } catch {
             exists := false
         }
-        if exists
+        if (exists)
             return hwnd
         arr.RemoveAt(idx)
     }
@@ -108,7 +108,7 @@ LeafGetTopWindow(mon, leafId) {
 LeafGetOrderedList(mon, leafId) {
     global LeafWindows
     key := LeafKey(mon, leafId)
-    if !LeafWindows.Has(key)
+    if (!LeafWindows.Has(key))
         return []
     LeafCleanupList(key)
     return LeafWindows.Has(key) ? LeafWindows[key] : []

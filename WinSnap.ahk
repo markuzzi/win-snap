@@ -96,10 +96,10 @@ Esc:: {
 ; Win+Shift+Up: Fullscreen (erneut: UnSnap)
 #+Up:: {
     win := GetActiveWindow()
-    if !win
+    if (!win)
         return
     hwnd := win.hwnd
-    if LastDir.Has(hwnd) && (LastDir[hwnd] = "up")
+    if (LastDir.Has(hwnd) && (LastDir[hwnd] = "up"))
         UnSnapWindow(hwnd)
     else {
         mon := GetMonitorIndexAndArea(hwnd)
@@ -112,7 +112,7 @@ Esc:: {
 ; Win+Shift+Down: minimieren
 #+Down:: {
     win := GetActiveWindow()
-    if !win
+    if (!win)
         return
     hwnd := win.hwnd
     HideHighlight()
@@ -160,11 +160,11 @@ Esc:: {
 ^!h:: {
     global HighlightEnabled, CurrentLeafSelection
     HighlightEnabled := !HighlightEnabled
-    if !HighlightEnabled
+    if (!HighlightEnabled)
         HideHighlight()
     else {
         for mon, state in CurrentLeafSelection {
-            if state.leaf {
+            if (state.leaf) {
                 ApplyLeafHighlight(mon, state.leaf)
                 break
             }

@@ -4,9 +4,9 @@
 
 OverlayEnsure() {
     global SnapOverlay
-    if !IsObject(SnapOverlay)
+    if (!IsObject(SnapOverlay))
         SnapOverlay := {}
-    if !SnapOverlay.HasOwnProp("edges")
+    if (!SnapOverlay.HasOwnProp("edges"))
         SnapOverlay.edges := []
 }
 
@@ -14,7 +14,9 @@ OverlayClear() {
     global SnapOverlay
     OverlayEnsure()
     for edge in SnapOverlay.edges {
-        try edge.Destroy()
+        try {
+            edge.Destroy()
+        }
     }
     SnapOverlay.edges := []
 }
@@ -34,7 +36,9 @@ OverlayAddRect(rect, color, thickness := 0) {
         g.BackColor := color
         g.Show("NA")
         opacity := (IsSet(OverlayOpacity) && OverlayOpacity) ? OverlayOpacity : 150
-        try WinSetTransparent(opacity, g)
+        try {
+            WinSetTransparent(opacity, g)
+        }
         g.Move(x, y, w, h)
         SnapOverlay.edges.Push(g)
     } catch Error as e {
@@ -47,11 +51,15 @@ ShowRectOverlay(rectArray, color, duration := 0) {
     OverlayClear()
 
     for rect in rectArray {
-        try OverlayAddRect(rect, color)
+        try {
+            OverlayAddRect(rect, color)
+        }
     }
 
     if (duration > 0)
-        try SetTimer(HideSnapOverlay, -Abs(duration))
+        try {
+            SetTimer(HideSnapOverlay, -Abs(duration))
+        }
 }
 
 HideSnapOverlay(*) {

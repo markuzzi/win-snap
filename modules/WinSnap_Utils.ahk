@@ -12,7 +12,7 @@ GetActiveWindow() {
     } catch {
         return 0
     }
-    if !hwnd || !DllCall("IsWindow", "ptr", hwnd) || !WinExist("ahk_id " hwnd)
+    if (!hwnd || !DllCall("IsWindow", "ptr", hwnd) || !WinExist("ahk_id " hwnd))
         return 0
     try {
         WinGetPos &x, &y, &w, &h, "ahk_id " hwnd
@@ -86,7 +86,7 @@ MoveWindow(hwnd, x, y, w, h) {
     catch {
         exists := false
     }
-    if !exists
+    if (!exists)
         return false
     EnsureRestorable(hwnd)
     x := Round(x)
@@ -113,10 +113,10 @@ MoveWindow(hwnd, x, y, w, h) {
         if (Abs(cx - x) <= 1 && Abs(cy - y) <= 1 && Abs(cw - w) <= 1 && Abs(ch - h) <= 1)
             done := true
     }
-    if done {
+    if (done) {
         try {
             global WinToLeaf
-            if WinToLeaf.Has(hwnd) {
+            if (WinToLeaf.Has(hwnd)) {
                 info := WinToLeaf[hwnd]
                 ApplyLeafHighlight(info.mon, info.leaf)
             }

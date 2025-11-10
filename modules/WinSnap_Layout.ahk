@@ -4,16 +4,16 @@
 Layout_Ensure(mon) {
     global Layouts
     needsReset := false
-    if !Layouts.Has(mon) {
+    if (!Layouts.Has(mon)) {
         needsReset := true
     } else {
         layout := Layouts[mon]
-        if !layout.HasOwnProp("nodes") || !IsObject(layout.nodes)
+        if (!layout.HasOwnProp("nodes") || !IsObject(layout.nodes))
             needsReset := true
-        else if !layout.nodes.Has(layout.root)
+        else if (!layout.nodes.Has(layout.root))
             needsReset := true
     }
-    if !needsReset
+    if (!needsReset)
         return
     nodes := Map()
     nodes[1] := { id:1, parent:0, split:"", frac:0.5, a:0, b:0 }  ; root unsplittet
@@ -24,7 +24,7 @@ Layout_Ensure(mon) {
 Layout_Node(mon, id) {
     global Layouts
     Layout_Ensure(mon)
-    if !Layouts.Has(mon)
+    if (!Layouts.Has(mon))
         return 0
     nodes := Layouts[mon].nodes
     return nodes.Has(id) ? nodes[id] : 0
@@ -33,10 +33,10 @@ Layout_Node(mon, id) {
 Layout_IsLeaf(mon, id) {
     global Layouts
     Layout_Ensure(mon)
-    if !Layouts.Has(mon)
+    if (!Layouts.Has(mon))
         return false
     nodes := Layouts[mon].nodes
-    if !nodes.Has(id)
+    if (!nodes.Has(id))
         return false
     n := nodes[id]
     return (n.split = "")
@@ -65,19 +65,19 @@ Layout_NodeRect(mon, nodeId) {
     Layout_Ensure(mon)
     monInfo := GetMonitorWork(mon)
     rect := { L:monInfo.left, T:monInfo.top, R:monInfo.right, B:monInfo.bottom }
-    if !Layouts.Has(mon)
+    if (!Layouts.Has(mon))
         return rect
     nodes := Layouts[mon].nodes
-    if !nodes.Has(nodeId)
+    if (!nodes.Has(nodeId))
         nodeId := Layouts[mon].root
-    if !nodes.Has(nodeId)
+    if (!nodes.Has(nodeId))
         return rect
 
     path := []
     cur := nodeId
     rootId := Layouts[mon].root
     while (cur != rootId) {
-        if !nodes.Has(cur)
+        if (!nodes.Has(cur))
             break
         parent := nodes[cur].parent
         if (parent = 0 || !nodes.Has(parent))
@@ -131,7 +131,7 @@ GetLeafRect(mon, leafId) {
 Layout_AllLeafRects(mon) {
     global Layouts
     Layout_Ensure(mon)
-    if !Layouts.Has(mon)
+    if (!Layouts.Has(mon))
         return Map()
     out := Map()
     for id, n in Layouts[mon].nodes {
@@ -144,16 +144,16 @@ Layout_AllLeafRects(mon) {
 Layout_FindLeafAtPoint(mon, x, y) {
     global Layouts
     Layout_Ensure(mon)
-    if !Layouts.Has(mon)
+    if (!Layouts.Has(mon))
         return 0
     rect := GetMonitorWork(mon)
     nodes := Layouts[mon].nodes
     rootId := Layouts[mon].root
-    if !nodes.Has(rootId)
+    if (!nodes.Has(rootId))
         return 0
     id := rootId
     loop {
-        if !nodes.Has(id)
+        if (!nodes.Has(id))
             return rootId
         n := nodes[id]
         if (n.split = "")
@@ -184,7 +184,7 @@ Layout_RemoveLeaf(mon, leafId) {
     global Layouts
     Layout_Ensure(mon)
     nodes := Layouts[mon].nodes
-    if !nodes.Has(leafId)
+    if (!nodes.Has(leafId))
         return 0
     leaf := nodes[leafId]
     if (leaf.parent = 0)
@@ -218,7 +218,7 @@ Layout_RemoveLeaf(mon, leafId) {
 
 FindNeighborLeaf(mon, leafId, dir) {
     rects := Layout_AllLeafRects(mon)
-    if !rects.Has(leafId)
+    if (!rects.Has(leafId))
         return 0
     cur := rects[leafId]
     tol := 2
@@ -304,7 +304,7 @@ Layout_SaveAll() {
     data := Layout_SerializeAll()
     try {
         layoutFile := FileOpen(path, "w", "UTF-8")
-        if layoutFile {
+        if (layoutFile) {
             layoutFile.Write(jxon_dump(data, indent := 2))
             layoutFile.Close()
         }
@@ -318,7 +318,7 @@ Layout_LoadAll() {
     path := Layout_GetStoragePath()
     Layouts := Map()
 
-    if !FileExist(path) {
+    if (!FileExist(path)) {
         ; Wenn keine Datei existiert → Standardlayout für alle Monitore erstellen
         monCount := MonitorGetCount()
         Loop monCount {
@@ -327,16 +327,16 @@ Layout_LoadAll() {
         return
     }
 
-    try
+    try {
         text := FileRead(path, "UTF-8")
-    catch {
+    } catch {
         MsgBox "Layout_LoadAll(): Fehler beim Lesen der Datei!"
         return
     }
 
-    try
+    try {
         data := jxon_load(&text)
-    catch {
+    } catch {
         MsgBox "Layout_LoadAll(): Fehler beim Parsen der Layout-JSON!"
         return
     }
@@ -349,7 +349,7 @@ Layout_LoadAll() {
         if (monIdx > monCount)
             continue  ; Monitor existiert nicht mehr
         nodes := Map()
-        if layout.HasOwnProp("nodes") {
+        if (layout.HasOwnProp("nodes")) {
             for id, node in layout.nodes {
                 nid := Layout_ToInt(id, 1)
                 nodes[nid] := {
@@ -371,7 +371,7 @@ Layout_LoadAll() {
 
     ; Sicherstellen, dass alle angeschlossenen Monitore Layouts haben
     Loop monCount {
-        if !Layouts.Has(A_Index)
+        if (!Layouts.Has(A_Index))
             Layout_Ensure(A_Index)
     }
 
@@ -433,7 +433,7 @@ SaveLeafAssignment(mon, leafId, hwnd) {
         return
 
     ; Initialisiere assignments-Array falls nicht vorhanden
-    if !Layouts[mon].HasOwnProp("assignments")
+    if (!Layouts[mon].HasOwnProp("assignments"))
         Layouts[mon].assignments := []
 
     assignments := Layouts[mon].assignments
@@ -454,11 +454,11 @@ SaveLeafAssignment(mon, leafId, hwnd) {
 AutoSnap_AssignedWindows() {
     global Layouts
     for mon, layout in Layouts {
-        if !layout.HasOwnProp("assignments")
+        if (!layout.HasOwnProp("assignments"))
             continue
 
         for entry in layout.assignments {
-            if !entry.HasOwnProp("exe") || !entry.HasOwnProp("title") || !entry.HasOwnProp("leaf")
+            if (!entry.HasOwnProp("exe") || !entry.HasOwnProp("title") || !entry.HasOwnProp("leaf"))
                 continue
 
             try {
@@ -499,7 +499,7 @@ FindWindow(exe, title := "") {
 AutoSnap_NewlyStartedWindows() {
     global Layouts
     for mon, layout in Layouts {
-        if !layout.HasOwnProp("assignments")
+        if (!layout.HasOwnProp("assignments"))
             continue
 
         for entry in layout.assignments {

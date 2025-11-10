@@ -11,7 +11,7 @@ SnapToLeaf(hwnd, mon, leafId) {
 }
 
 MoveWindowIntoLeaf(hwnd, ctx) {
-    if !ctx || !ctx.mon || !ctx.leaf
+    if (!ctx || !ctx.mon || !ctx.leaf)
         return
     EnsureHistory(hwnd)
     SnapToLeaf(hwnd, ctx.mon, ctx.leaf)
@@ -19,19 +19,23 @@ MoveWindowIntoLeaf(hwnd, ctx) {
 
 EnsureHistory(hwnd) {
     global WinHistory
-    if WinHistory.Has(hwnd)
+    if (WinHistory.Has(hwnd))
         return
-    WinGetPos &x, &y, &w, &h, "ahk_id " hwnd
+    try {
+        WinGetPos &x, &y, &w, &h, "ahk_id " hwnd
+    } catch {
+        return
+    }
     WinHistory[hwnd] := { x:x, y:y, w:w, h:h }
 }
 
 UnSnapWindow(hwnd) {
     global WinHistory, LastDir
-    if WinHistory.Has(hwnd) && DllCall("IsWindow", "ptr", hwnd) && WinExist("ahk_id " hwnd) {
+    if (WinHistory.Has(hwnd) && DllCall("IsWindow", "ptr", hwnd) && WinExist("ahk_id " hwnd)) {
         prev := WinHistory[hwnd]
-        if MoveWindow(hwnd, prev.x, prev.y, prev.w, prev.h) {
+        if (MoveWindow(hwnd, prev.x, prev.y, prev.w, prev.h)) {
             WinHistory.Delete(hwnd)
-            if LastDir.Has(hwnd)
+            if (LastDir.Has(hwnd))
                 LastDir.Delete(hwnd)
             LeafDetachWindow(hwnd, true)
         }
@@ -42,7 +46,7 @@ UnSnapWindow(hwnd) {
 GridMove(dir) {
     global WinToLeaf, LastDir, Layouts
     win := GetActiveWindow()
-    if !win
+    if (!win)
         return
     hwnd := win.hwnd
     monInfo := GetMonitorIndexAndArea(hwnd)
@@ -54,11 +58,11 @@ GridMove(dir) {
     cy := win.y + win.h/2
 
     ; --- Fenster noch nicht gesnappt ---
-    if !WinToLeaf.Has(hwnd) {
+    if (!WinToLeaf.Has(hwnd)) {
         EnsureHistory(hwnd)
 
         ; Root ggf. automatisch splitten (damit Win+←/→/↑/↓ sofort snappen)
-        if Layout_IsLeaf(mon, root) {
+        if (Layout_IsLeaf(mon, root)) {
             if (dir = "left" || dir = "right")
                 Layout_SplitLeaf(mon, root, "v")
             else if (dir = "up" || dir = "down")
@@ -75,7 +79,7 @@ GridMove(dir) {
     ; --- Fenster ist gesnappt → Nachbar suchen ---
     curLeaf := WinToLeaf[hwnd].leaf
     next := FindNeighborLeaf(mon, curLeaf, dir)
-    if next {
+    if (next) {
         SnapToLeaf(hwnd, mon, next)
         SetLastDirection(hwnd, dir)
         return
@@ -83,12 +87,12 @@ GridMove(dir) {
 
     ; --- Kein Nachbar-Leaf → versuche Nachbar-Monitor ---
     nextMon := FindNeighborMonitor(mon, dir)
-    if !nextMon
+    if (!nextMon)
         return
 
     Layout_Ensure(nextMon)
     nextLeaf := GetSelectedLeaf(nextMon)
-    if !nextLeaf
+    if (!nextLeaf)
         nextLeaf := Layouts[nextMon].root
 
     ; Fenster physisch auf den nächsten Monitor verschieben
@@ -154,7 +158,7 @@ SplitCurrentLeaf(orient) {
     global WinToLeaf, Layouts, LastDir
     ; orient = "v" (links/rechts) oder "h" (oben/unten)
     win := GetActiveWindow()
-    if !win
+    if (!win)
         return
     hwnd := win.hwnd
     monInfo := GetMonitorIndexAndArea(hwnd)
@@ -165,7 +169,7 @@ SplitCurrentLeaf(orient) {
     leaf := ctx.leaf
     if (!leaf && WinToLeaf.Has(hwnd) && WinToLeaf[hwnd].mon = mon)
         leaf := WinToLeaf[hwnd].leaf
-    if !leaf {
+    if (!leaf) {
         EnsureHistory(hwnd)
         if (mon = monInfo.index) {
             cx := win.x + win.w/2, cy := win.y + win.h/2
@@ -176,10 +180,10 @@ SplitCurrentLeaf(orient) {
     }
 
     nBefore := Layout_Node(mon, leaf)
-    if !nBefore {
+    if (!nBefore) {
         leaf := Layouts[mon].root
         nBefore := Layout_Node(mon, leaf)
-        if !nBefore
+        if (!nBefore)
             return
     }
     if (nBefore.split != "")
@@ -187,7 +191,7 @@ SplitCurrentLeaf(orient) {
     Layout_SplitLeaf(mon, leaf, orient)
 
     nAfter := Layout_Node(mon, leaf)   ; nun interner Knoten
-    if !nAfter
+    if (!nAfter)
         return
     leftOrTop := nAfter.a
     SelectLeaf(mon, leftOrTop, "manual")
@@ -198,7 +202,7 @@ SplitCurrentLeaf(orient) {
 AdjustBoundaryForActive(whichArrow) {
     global SplitStep, Layouts
     ctx := ApplyManualNavigation(GetLeafNavigationContext())
-    if !ctx.mon || !ctx.leaf
+    if (!ctx.mon || !ctx.leaf)
         return
     mon := ctx.mon
     leaf := ctx.leaf
@@ -226,12 +230,12 @@ AdjustBoundaryForActive(whichArrow) {
 
     step := SplitStep
     if (axis = "v") {
-        if leftOrTop
+        if (leftOrTop)
             p.frac += (whichArrow="Right") ? +step : -step
         else
             p.frac += (whichArrow="Right") ? -step : +step
     } else {
-        if leftOrTop
+        if (leftOrTop)
             p.frac += (whichArrow="Down") ? +step : -step
         else
             p.frac += (whichArrow="Down") ? -step : +step
@@ -246,38 +250,38 @@ AdjustBoundaryForActive(whichArrow) {
 SwitchSnapArea(dir) {
     global Layouts
     ctx := ApplyManualNavigation(GetLeafNavigationContext())
-    if !ctx.mon
+    if (!ctx.mon)
         return
     Layout_Ensure(ctx.mon)
-    if !ctx.leaf {
+    if (!ctx.leaf) {
         sel := GetSelectedLeaf(ctx.mon)
-        if sel
+        if (sel)
             ctx.leaf := sel
         else
             ctx.leaf := Layouts[ctx.mon].root
     }
-    if !ctx.leaf
+    if (!ctx.leaf)
         return
     neighbor := FindNeighborLeaf(ctx.mon, ctx.leaf, dir)
-    if neighbor {
+    if (neighbor) {
         SelectLeaf(ctx.mon, neighbor, "manual")
         target := LeafGetTopWindow(ctx.mon, neighbor)
-        if target
+        if (target)
             WinActivate "ahk_id " target
         else
             FlashLeafOutline(ctx.mon, neighbor)
         return
     }
     nextMon := FindNeighborMonitor(ctx.mon, dir)
-    if !nextMon
+    if (!nextMon)
         return
     Layout_Ensure(nextMon)
     leaf := GetSelectedLeaf(nextMon)
-    if !leaf
+    if (!leaf)
         leaf := Layouts[nextMon].root
     SelectLeaf(nextMon, leaf, "manual")
     target := LeafGetTopWindow(nextMon, leaf)
-    if target
+    if (target)
         WinActivate "ahk_id " target
     else
         FlashLeafOutline(nextMon, leaf)
@@ -329,10 +333,10 @@ FindNeighborMonitor(mon, dir) {
 CycleWindowInLeaf(direction) {
     global WinToLeaf
     win := GetActiveWindow()
-    if !win
+    if (!win)
         return
     hwnd := win.hwnd
-    if !WinToLeaf.Has(hwnd)
+    if (!WinToLeaf.Has(hwnd))
         return
     info := WinToLeaf[hwnd]
     arr := LeafGetOrderedList(info.mon, info.leaf)
@@ -352,26 +356,26 @@ CycleWindowInLeaf(direction) {
     else
         idx := (idx = 1) ? arr.Length : idx - 1
     target := arr[idx]
-    if WinExist("ahk_id " target)
+    if (WinExist("ahk_id " target))
         WinActivate "ahk_id " target
 }
 
 DeleteCurrentSnapArea() {
     global LeafWindows
     ctx := ApplyManualNavigation(GetLeafNavigationContext())
-    if !ctx.mon || !ctx.leaf
+    if (!ctx.mon || !ctx.leaf)
         return
     Layout_Ensure(ctx.mon)
     rects := Layout_AllLeafRects(ctx.mon)
     if (rects.Count <= 1)
         return
     node := Layout_Node(ctx.mon, ctx.leaf)
-    if !node
+    if (!node)
         return
     if (node.parent = 0)
         return
     parent := Layout_Node(ctx.mon, node.parent)
-    if !parent
+    if (!parent)
         return
     siblingId := (parent.a = ctx.leaf) ? parent.b : parent.a
     if (siblingId = 0)
@@ -380,14 +384,14 @@ DeleteCurrentSnapArea() {
     for hwnd in LeafGetOrderedList(ctx.mon, ctx.leaf)
         arrCopy.Push(hwnd)
     promoted := Layout_RemoveLeaf(ctx.mon, ctx.leaf)
-    if !promoted
+    if (!promoted)
         return
     for hwnd in arrCopy {
-        if DllCall("IsWindow", "ptr", hwnd) && WinExist("ahk_id " hwnd)
+        if (DllCall("IsWindow", "ptr", hwnd) && WinExist("ahk_id " hwnd))
             SnapToLeaf(hwnd, ctx.mon, siblingId)
     }
     key := LeafKey(ctx.mon, ctx.leaf)
-    if LeafWindows.Has(key)
+    if (LeafWindows.Has(key))
         LeafWindows.Delete(key)
     ReapplySubtree(ctx.mon, siblingId)
     SelectLeaf(ctx.mon, siblingId, "manual")
@@ -415,24 +419,24 @@ ShowAllSnapAreasHotkey() {
 CollectWindowsInActiveLeaf() {
     global Layouts
     ctx := ApplyManualNavigation(GetLeafNavigationContext())
-    if !ctx.mon
+    if (!ctx.mon)
         return
     Layout_Ensure(ctx.mon)
-    if !ctx.leaf {
+    if (!ctx.leaf) {
         sel := GetSelectedLeaf(ctx.mon)
         ctx.leaf := sel ? sel : Layouts[ctx.mon].root
     }
-    if !ctx.leaf
+    if (!ctx.leaf)
         return
-    if !Layouts[ctx.mon].nodes.Has(ctx.leaf)
+    if (!Layouts[ctx.mon].nodes.Has(ctx.leaf))
         ctx.leaf := Layouts[ctx.mon].root
     rect := GetLeafRectPx(ctx.mon, ctx.leaf)
     ids := WinGetList()
     collected := 0
     for hwnd in ids {
-        if !IsCollectibleSnapWindow(hwnd)
+        if (!IsCollectibleSnapWindow(hwnd))
             continue
-        if !WindowCenterInsideRect(hwnd, rect)
+        if (!WindowCenterInsideRect(hwnd, rect))
             continue
         EnsureHistory(hwnd)
         SnapToLeaf(hwnd, ctx.mon, ctx.leaf)
@@ -442,16 +446,16 @@ CollectWindowsInActiveLeaf() {
     FlashLeafOutline(ctx.mon, ctx.leaf)
     if (collected > 0) {
         top := LeafGetTopWindow(ctx.mon, ctx.leaf)
-        if top
+        if (top)
             WinActivate "ahk_id " top
     }
 }
 
 IsCollectibleSnapWindow(hwnd) {
     static scriptPid := DllCall("GetCurrentProcessId")
-    if !hwnd
+    if (!hwnd)
         return false
-    if !DllCall("IsWindow", "ptr", hwnd) || !WinExist("ahk_id " hwnd)
+    if (!DllCall("IsWindow", "ptr", hwnd) || !WinExist("ahk_id " hwnd))
         return false
     try {
         pid := WinGetPID("ahk_id " hwnd)
@@ -473,7 +477,7 @@ IsCollectibleSnapWindow(hwnd) {
         style := 0
     }
     WS_VISIBLE := 0x10000000
-    if !(style & WS_VISIBLE)
+    if (!(style & WS_VISIBLE))
         return false
     try {
         mm := WinGetMinMax("ahk_id " hwnd)
@@ -486,7 +490,7 @@ IsCollectibleSnapWindow(hwnd) {
 }
 
 WindowCenterInsideRect(hwnd, rect) {
-    if !hwnd
+    if (!hwnd)
         return false
     try {
         WinGetPos &x, &y, &w, &h, "ahk_id " hwnd
