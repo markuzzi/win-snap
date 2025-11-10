@@ -79,19 +79,48 @@ EnsureRestorable(hwnd) {
     }
 }
 
+DebugLog(msg) {
+    global FrameCompDebug, FrameCompLogPath
+    if (!IsSet(FrameCompDebug) || !FrameCompDebug)
+        return
+    try {
+        stamp := FormatTime(, "yyyy-MM-dd HH:mm:ss")
+        FileAppend(stamp " | " msg "`n", FrameCompLogPath, "UTF-8")
+    }
+}
+
 ; Liefert die von DWM gemeldeten Extended Frame Bounds (sichtbare Fensteraussenkanten)
 GetExtendedFrameBounds(hwnd) {
     try {
         buf := Buffer(16, 0)
-        hr := DllCall("DwmGetWindowAttribute", "ptr", hwnd, "int", 9, "ptr", buf.Ptr, "uint", 16, "int")
-        if (hr != 0)
+        hMod := DllCall("GetModuleHandle", "str", "dwmapi.dll", "ptr")
+        if (!hMod) {
+            DebugLog("dwmapi.dll not loaded, calling LoadLibrary")
+            hMod := DllCall("LoadLibrary", "str", "dwmapi.dll", "ptr")
+        }
+        if (!hMod) {
+            DebugLog("LoadLibrary(dwmapi.dll) failed")
             return 0
+        }
+        pfn := DllCall("GetProcAddress", "ptr", hMod, "astr", "DwmGetWindowAttribute", "ptr")
+        if (!pfn) {
+            DebugLog("GetProcAddress(DwmGetWindowAttribute) failed")
+            return 0
+        }
+        ; DWMWA_EXTENDED_FRAME_BOUNDS = 9
+        hr := DllCall(pfn, "ptr", hwnd, "int", 9, "ptr", buf.Ptr, "uint", 16, "int")
+        if (hr != 0) {
+            DebugLog(Format("EFB hr={} (non-zero) for hwnd={}", hr, hwnd))
+            return 0
+        }
         l := NumGet(buf, 0, "Int")
         t := NumGet(buf, 4, "Int")
         r := NumGet(buf, 8, "Int")
         b := NumGet(buf, 12, "Int")
+        DebugLog(Format("EFB L={},T={},R={},B={} for hwnd={}", l, t, r, b, hwnd))
         return { L:l, T:t, R:r, B:b }
     } catch {
+        DebugLog(Format("EFB call failed for hwnd={}", hwnd))
         return 0
     }
 }
@@ -113,22 +142,31 @@ MoveWindow(hwnd, x, y, w, h) {
     w := Max(1, Round(w))
     h := Max(1, Round(h))
 
-    ; Klassenbasierte Kompensation anwenden (falls vorhanden)
+    ; Klassen-/Prozess-basierte Kompensation anwenden (falls vorhanden)
     x0 := x, y0 := y, w0 := w, h0 := h
     className := ""
     try {
         className := WinGetClass("ahk_id " hwnd)
     }
+    procName := ""
+    try {
+        procName := WinGetProcessName("ahk_id " hwnd)
+    }
+    if (procName = "")
+        procName := "unknown"
+    cacheKey := className ":" procName
+    DebugLog(Format("MoveWindow start hwnd={}, class={}, proc={}, key={}, target=({}, {}, {}, {})", hwnd, className, procName, cacheKey, x, y, w, h))
 
     try {
         global FrameComp
-        if (FrameComp.Has(className)) {
-            off := FrameComp[className]
+        if (FrameComp.Has(cacheKey)) {
+            off := FrameComp[cacheKey]
             if (off) {
                 x0 := x - off.L
                 y0 := y - off.T
                 w0 := w + off.L + off.R
                 h0 := h + off.T + off.B
+                DebugLog(Format("Using cached offset for key {}: L={},T={},R={},B={} => preMove=({}, {}, {}, {})", cacheKey, off.L, off.T, off.R, off.B, x0, y0, w0, h0))
             }
         }
     }
@@ -137,6 +175,7 @@ MoveWindow(hwnd, x, y, w, h) {
     try {
         WinMove x0, y0, w0, h0, "ahk_id " hwnd
     } catch {
+        DebugLog("WinMove initial failed")
         return false
     }
     Sleep 15
@@ -148,6 +187,7 @@ MoveWindow(hwnd, x, y, w, h) {
         dxT := Max(0, efb.T - y)
         dxR := Max(0, (x + w) - efb.R)
         dxB := Max(0, (y + h) - efb.B)
+        DebugLog(Format("EFB deltas L={},T={},R={},B={} for target=({}, {}, {}, {})", dxL, dxT, dxR, dxB, x, y, w, h))
         if (dxL || dxT || dxR || dxB) {
             x1 := x - dxL
             y1 := y - dxT
@@ -159,11 +199,17 @@ MoveWindow(hwnd, x, y, w, h) {
             Sleep 10
             try {
                 ; Cache pro Klassenname ablegen
-                if (className != "") {
-                    FrameComp[className] := { L:dxL, T:dxT, R:dxR, B:dxB }
+                if (cacheKey != ":unknown") {
+                    FrameComp[cacheKey] := { L:dxL, T:dxT, R:dxR, B:dxB }
+                    DebugLog(Format("Cached offset for key {}: L={},T={},R={},B={}", cacheKey, dxL, dxT, dxR, dxB))
                 }
             }
         }
+        else {
+            DebugLog("No EFB correction needed")
+        }
+    } else {
+        DebugLog("EFB unavailable; skip correction")
     }
 
     ; Highlight reaktivieren, falls bekanntem Leaf zugeordnet
@@ -175,6 +221,7 @@ MoveWindow(hwnd, x, y, w, h) {
         }
     }
 
+    DebugLog("MoveWindow end OK")
     return true
 }
 

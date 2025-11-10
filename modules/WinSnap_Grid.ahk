@@ -5,6 +5,7 @@
 
 SnapToLeaf(hwnd, mon, leafId) {
     r := GetLeafRectPx(mon, leafId)
+    DebugLog(Format("SnapToLeaf hwnd={}, mon={}, leaf={}, rect=({}, {}, {}, {})", hwnd, mon, leafId, r.L, r.T, r.R, r.B))
     MoveWindow(hwnd, r.L, r.T, r.R - r.L, r.B - r.T)
     LeafAttachWindow(hwnd, mon, leafId)
     ApplyLeafHighlight(mon, leafId)
@@ -193,6 +194,7 @@ SplitCurrentLeaf(orient) {
     wasEmpty := true
     if (Layout_IsLeaf(mon, leaf))
         wasEmpty := !LeafHasWindows(mon, leaf)
+    DebugLog(Format("SplitCurrentLeaf mon={}, leaf={}, orient={}, wasEmpty={}", mon, leaf, orient, wasEmpty))
     Layout_SplitLeaf(mon, leaf, orient)
 
     nAfter := Layout_Node(mon, leaf)   ; nun interner Knoten
