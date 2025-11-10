@@ -557,7 +557,7 @@ SetTimer(AutoSnap_NewlyStartedWindows, 2000)
 ; =========================
 
 Layout_ClearMonitorState(mon) {
-    global LeafWindows, WinToLeaf, CurrentLeafSelection
+    global LeafWindows, WinToLeaf, CurrentLeafSelection, CurrentHighlight
     delKeys := []
     for key in LeafWindows {
         try {
@@ -579,6 +579,12 @@ Layout_ClearMonitorState(mon) {
         if (CurrentLeafSelection.Has(mon))
             CurrentLeafSelection.Delete(mon)
     }
+    ; Manuelle Navigation und ggf. aktives Highlight fr diesen Monitor zurcksetzen
+    try ManualNav_Clear(mon)
+    try {
+        if (CurrentHighlight.mon = mon)
+            HideHighlight()
+    }
 }
 
 Layout_ResetMonitor(mon) {
@@ -588,6 +594,7 @@ Layout_ResetMonitor(mon) {
     Layout_Ensure(mon)
     Layout_ClearMonitorState(mon)
     LogInfo(Format("Layout_ResetMonitor: mon={}", mon))
+    Layout_SelectFirstLeaf(mon)
 }
 
 Layout_SetMonitorColumns(mon, fracs) {
@@ -617,6 +624,7 @@ Layout_SetMonitorColumns(mon, fracs) {
     }
     Layout_SaveAll()
     LogInfo(Format("Layout_SetMonitorColumns: mon={}, cols={}", mon, fracs.Length))
+    Layout_SelectFirstLeaf(mon)
 }
 
 Layout_SetMonitorQuadrants(mon) {
@@ -639,4 +647,25 @@ Layout_SetMonitorQuadrants(mon) {
     Layouts[mon].nodes[bottom] := nb
     Layout_SaveAll()
     LogInfo(Format("Layout_SetMonitorQuadrants: mon={}", mon))
+    Layout_SelectFirstLeaf(mon)
+}
+
+; Wählt ein stabiles erstes Leaf (links oben) für den Monitor
+Layout_SelectFirstLeaf(mon) {
+    Layout_Ensure(mon)
+    rects := Layout_AllLeafRects(mon)
+    if (rects.Count = 0)
+        return
+    bestId := 0
+    bestL := 10**9, bestT := 10**9
+    for id, r in rects {
+        px := ToPixelRect(mon, r)
+        if (px.L < bestL) || (px.L = bestL && px.T < bestT) {
+            bestL := px.L
+            bestT := px.T
+            bestId := id
+        }
+    }
+    if (bestId)
+        SelectLeaf(mon, bestId, "manual")
 }

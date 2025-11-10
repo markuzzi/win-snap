@@ -192,7 +192,12 @@ MoveWindow(hwnd, x, y, w, h) {
     }
     if (procName = "")
         procName := "unknown"
-    cacheKey := className ":" procName
+    monIdx := 0
+    try {
+        mi := GetMonitorIndexAndArea(hwnd)
+        monIdx := mi.index
+    }
+    cacheKey := className ":" procName ":" monIdx
     DebugLog(Format("MoveWindow start hwnd={}, class={}, proc={}, key={}, target=({}, {}, {}, {})", hwnd, className, procName, cacheKey, x, y, w, h))
 
     try {
@@ -221,30 +226,35 @@ MoveWindow(hwnd, x, y, w, h) {
     ; Extended Frame Bounds ermitteln und ggf. korrigieren
     efb := GetExtendedFrameBounds(hwnd)
     if (efb) {
-        dxL := Max(0, efb.L - x)
-        dxT := Max(0, efb.T - y)
-        dxR := Max(0, (x + w) - efb.R)
-        dxB := Max(0, (y + h) - efb.B)
-        DebugLog(Format("EFB deltas L={},T={},R={},B={} for target=({}, {}, {}, {})", dxL, dxT, dxR, dxB, x, y, w, h))
-        if (dxL || dxT || dxR || dxB) {
-            x1 := x - dxL
-            y1 := y - dxT
-            w1 := w + dxL + dxR
-            h1 := h + dxT + dxB
+        ; Margins zwischen gesetztem Rechteck (x0..x0+w0) und EFB messen
+        mL := efb.L - x0
+        mT := efb.T - y0
+        mR := (x0 + w0) - efb.R
+        mB := (y0 + h0) - efb.B
+        DebugLog(Format("EFB margins L={},T={},R={},B={} for preMove=({}, {}, {}, {})", mL, mT, mR, mB, x0, y0, w0, h0))
+        ; Neues Ziel unter Bercksichtigung der Margins berechnen (kann schrumpfen oder wachsen)
+        x1 := x - mL
+        y1 := y - mT
+        w1 := w + mL + mR
+        h1 := h + mT + mB
+        ; minimale Gre garantieren
+        w1 := Max(1, Round(w1))
+        h1 := Max(1, Round(h1))
+        ; Nur bewegen, wenn sich etwas ndert
+        if (x1 != x0 || y1 != y0 || w1 != w0 || h1 != h0) {
             try {
                 WinMove x1, y1, w1, h1, "ahk_id " hwnd
             }
             Sleep 10
-            try {
-                ; Cache pro Klassenname ablegen
-                if (cacheKey != ":unknown") {
-                    FrameComp[cacheKey] := { L:dxL, T:dxT, R:dxR, B:dxB }
-                    DebugLog(Format("Cached offset for key {}: L={},T={},R={},B={}", cacheKey, dxL, dxT, dxR, dxB))
-                }
-            }
+        } else {
+            DebugLog("No EFB correction needed (margins 0)")
         }
-        else {
-            DebugLog("No EFB correction needed")
+        ; Cache pro Klasse/Prozess ablegen (mit Vorzeichen)
+        try {
+            if (cacheKey != ":unknown:0") {
+                FrameComp[cacheKey] := { L:mL, T:mT, R:mR, B:mB }
+                DebugLog(Format("Cached margins for key {}: L={},T={},R={},B={}", cacheKey, mL, mT, mR, mB))
+            }
         }
     } else {
         DebugLog("EFB unavailable; skip correction")
