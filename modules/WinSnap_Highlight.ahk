@@ -77,7 +77,7 @@ ApplyLeafHighlight(mon, leafId) {
     rect := ToPixelRect(mon, GetLeafRect(mon, leafId))
     ShowHighlightRect(rect)
     CurrentHighlight := {mon:mon, leaf:leafId}
-    LogInfo(Format("ApplyLeafHighlight: mon={}, leaf={}", mon, leafId))
+    LogTrace(Format("ApplyLeafHighlight: mon={}, leaf={}", mon, leafId))
 }
 
 UpdateActiveHighlight(*) {

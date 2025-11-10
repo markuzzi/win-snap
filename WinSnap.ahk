@@ -49,7 +49,7 @@ global FrameCompDebug := true
 global FrameCompLogPath := A_ScriptDir "\WinSnap.log"
 global ActivateOnAreaSwitch := true    ; Beim Snap-Area-Wechsel Fenster fokussieren? (false = nur Auswahl/Highlight)
 global LoggingEnabled := true          ; Logging ein/aus
-global LoggingLevel := 2               ; 0=aus, 1=INFO, 2=DEBUG
+global LoggingLevel := 2               ; 0=aus, 1=INFO, 2=DEBUG, 3=TRACE
 global LoggingPath := FrameCompLogPath ; Pfad zur Logdatei
 global ScriptPaused := false           ; eigener Pause-Status (Hotkeys + Timer)
 
@@ -199,12 +199,6 @@ Esc:: {
 ^!q:: {
     LogInfo("ExitApp via hotkey")
     ExitApp()
-}
-
-; Teal-Rahmen sofort ausblenden (ohne Toggle)
-+^!h:: {
-    HideHighlight()
-    LogInfo("Highlight hidden via force-hotkey")
 }
 
 TogglePause() {

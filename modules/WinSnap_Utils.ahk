@@ -103,6 +103,10 @@ LogDebug(msg) {
     LogWrite(2, "DEBUG", msg)
 }
 
+LogTrace(msg) {
+    LogWrite(3, "TRACE", msg)
+}
+
 ; Backward compat
 DebugLog(msg) {
     LogDebug(msg)
