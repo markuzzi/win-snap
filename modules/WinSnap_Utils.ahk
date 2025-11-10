@@ -196,17 +196,32 @@ MoveWindow(hwnd, x, y, w, h) {
     }
     if (procName = "")
         procName := "unknown"
+    ; EFB-Override-Policy ermitteln: "off" (überspringen), "shrink" (nur verkleinern), "full" (Standard)
+    policy := "full"
+    try {
+        global EfbSkip, EfbShrinkOnly
+        if (IsSet(EfbSkip)) {
+            if ((EfbSkip.Has("classes") && EfbSkip.classes.Has(className) && EfbSkip.classes[className])
+             || (EfbSkip.Has("processes") && EfbSkip.processes.Has(procName) && EfbSkip.processes[procName]))
+                policy := "off"
+        }
+        if (policy = "full" && IsSet(EfbShrinkOnly)) {
+            if ((EfbShrinkOnly.Has("classes") && EfbShrinkOnly.classes.Has(className) && EfbShrinkOnly.classes[className])
+             || (EfbShrinkOnly.Has("processes") && EfbShrinkOnly.processes.Has(procName) && EfbShrinkOnly.processes[procName]))
+                policy := "shrink"
+        }
+    }
     monIdx := 0
     try {
         mi := GetMonitorIndexAndArea(hwnd)
         monIdx := mi.index
     }
     cacheKey := className ":" procName ":" monIdx
-    DebugLog(Format("MoveWindow start hwnd={}, class={}, proc={}, key={}, target=({}, {}, {}, {})", hwnd, className, procName, cacheKey, x, y, w, h))
+    DebugLog(Format("MoveWindow start hwnd={}, class={}, proc={}, key={}, policy={}, target=({}, {}, {}, {})", hwnd, className, procName, cacheKey, policy, x, y, w, h))
 
     try {
         global FrameComp
-        if (FrameComp.Has(cacheKey)) {
+        if (policy = "full" && FrameComp.Has(cacheKey)) {
             off := FrameComp[cacheKey]
             if (off) {
                 x0 := x - off.L
@@ -215,6 +230,8 @@ MoveWindow(hwnd, x, y, w, h) {
                 h0 := h + off.T + off.B
                 DebugLog(Format("Using cached offset for key {}: L={},T={},R={},B={} => preMove=({}, {}, {}, {})", cacheKey, off.L, off.T, off.R, off.B, x0, y0, w0, h0))
             }
+        } else if (policy != "full") {
+            DebugLog("Skip cached offset due to EFB override policy")
         }
     }
 
@@ -228,8 +245,11 @@ MoveWindow(hwnd, x, y, w, h) {
     Sleep 15
 
     ; Extended Frame Bounds ermitteln und ggf. korrigieren
-    efb := GetExtendedFrameBounds(hwnd)
-    if (efb) {
+    if (policy = "off") {
+        DebugLog("EFB override: correction disabled for this window")
+    } else {
+        efb := GetExtendedFrameBounds(hwnd)
+        if (efb) {
         cacheOk := true
         ; Margins zwischen gesetztem Rechteck (x0..x0+w0) und EFB messen
         mL := efb.L - x0
@@ -245,6 +265,21 @@ MoveWindow(hwnd, x, y, w, h) {
         ; minimale Gre garantieren
         w1 := Max(1, Round(w1))
         h1 := Max(1, Round(h1))
+        ; Shrink-only erzwingen: niemals größer als der erste Move
+        if (policy = "shrink") {
+            grewH := (w1 > w0)
+            grewV := (h1 > h0)
+            if (grewH) {
+                DebugLog("EFB shrink-only: prevent horizontal growth")
+                x1 := x0
+                w1 := w0
+            }
+            if (grewV) {
+                DebugLog("EFB shrink-only: prevent vertical growth")
+                y1 := y0
+                h1 := h0
+            }
+        }
         ; Sanity-Check: Ausreißer erkennen (z.B. Terminal/Conhost)
         maxSide := 60  ; px pro Seite
         if (Abs(mL) > maxSide || Abs(mT) > maxSide || Abs(mR) > maxSide || Abs(mB) > maxSide) {
@@ -273,13 +308,14 @@ MoveWindow(hwnd, x, y, w, h) {
         }
         ; Cache pro Klasse/Prozess ablegen (mit Vorzeichen)
         try {
-            if (cacheOk && cacheKey != ":unknown:0") {
+            if (policy = "full" && cacheOk && cacheKey != ":unknown:0") {
                 FrameComp[cacheKey] := { L:mL, T:mT, R:mR, B:mB }
                 DebugLog(Format("Cached margins for key {}: L={},T={},R={},B={}", cacheKey, mL, mT, mR, mB))
             }
         }
-    } else {
-        DebugLog("EFB unavailable; skip correction")
+        } else {
+            DebugLog("EFB unavailable; skip correction")
+        }
     }
 
     ; Highlight reaktivieren, falls bekanntem Leaf zugeordnet

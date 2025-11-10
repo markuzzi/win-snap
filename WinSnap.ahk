@@ -47,6 +47,8 @@ global WindowSearch := {gui:"", edit:"", list:"", items:[], filtered:[], ctx:{},
 global FrameComp := Map()    ; Klassenname -> {L,T,R,B} Offsets fr Extended Frame Bounds-Kompensation
 global FrameCompDebug := true
 global FrameCompLogPath := A_ScriptDir "\WinSnap.log"
+global EfbSkip := { classes: Map(), processes: Map() }        ; EFB-Korrektur komplett überspringen
+global EfbShrinkOnly := { classes: Map(), processes: Map() }   ; EFB nur schrumpfen, nicht vergrößern
 global ActivateOnAreaSwitch := true    ; Beim Snap-Area-Wechsel Fenster fokussieren? (false = nur Auswahl/Highlight)
 global LoggingEnabled := true          ; Logging ein/aus
 global LoggingLevel := 2               ; 0=aus, 1=INFO, 2=DEBUG, 3=TRACE
@@ -68,7 +70,7 @@ global ScriptPaused := false           ; eigener Pause-Status (Hotkeys + Timer)
 #Include ".\modules\WinSnap_HotkeyOverlay.ahk"
 
 InitTrayIcon()
-TrayTip "WinSnap", "WinSnap geladen - Layouts bereit", 1500
+ShowTrayTip("WinSnap geladen - Layouts bereit", 1500)
 
 ; =========================
 ; Hotkeys
@@ -217,7 +219,7 @@ TogglePause() {
     }
     if (newState)
         HideHighlight()
-    TrayTip "WinSnap", newState ? "Pausiert" : "Aktiv", 1000
+    ShowTrayTip(newState ? "Pausiert" : "Aktiv", 1200)
     LogInfo(Format("TogglePause: {}", newState ? "paused" : "resumed"))
     UpdateTrayTooltip()
 }
@@ -308,4 +310,22 @@ UpdateTrayTooltip() {
     global ScriptPaused
     tip := ScriptPaused ? "WinSnap — Pausiert" : "WinSnap — Aktiv"
     try A_IconTip := tip
+}
+
+; Zeigt einen TrayTip für eine begrenzte Zeit und blendet ihn danach aus.
+ShowTrayTip(msg, ms := 1500, icon := "") {
+    try {
+        if (icon != "")
+            TrayTip "WinSnap", msg, icon
+        else
+            TrayTip "WinSnap", msg
+    }
+    try {
+        if (ms > 0)
+            SetTimer(ShowTrayTip_Hide, -ms)
+    }
+}
+
+ShowTrayTip_Hide() {
+    try TrayTip()
 }
