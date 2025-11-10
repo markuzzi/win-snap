@@ -188,6 +188,11 @@ SplitCurrentLeaf(orient) {
     }
     if (nBefore.split != "")
         return
+    ; Prüfen, ob die zu teilende SnapArea leer ist, damit wir nach dem Split
+    ; kein Fenster automatisch hinein verschieben.
+    wasEmpty := true
+    if (Layout_IsLeaf(mon, leaf))
+        wasEmpty := !LeafHasWindows(mon, leaf)
     Layout_SplitLeaf(mon, leaf, orient)
 
     nAfter := Layout_Node(mon, leaf)   ; nun interner Knoten
@@ -195,8 +200,10 @@ SplitCurrentLeaf(orient) {
         return
     leftOrTop := nAfter.a
     SelectLeaf(mon, leftOrTop, "manual")
-    SnapToLeaf(hwnd, mon, leftOrTop)
-    LastDir[hwnd] := (orient = "v") ? "left" : "top"
+    if (!wasEmpty) {
+        SnapToLeaf(hwnd, mon, leftOrTop)
+        LastDir[hwnd] := (orient = "v") ? "left" : "top"
+    }
 }
 
 AdjustBoundaryForActive(whichArrow) {
