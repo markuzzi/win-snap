@@ -49,7 +49,7 @@ global FrameCompDebug := true
 global FrameCompLogPath := A_ScriptDir "\WinSnap.log"
 global ActivateOnAreaSwitch := true    ; Beim Snap-Area-Wechsel Fenster fokussieren? (false = nur Auswahl/Highlight)
 global LoggingEnabled := true          ; Logging ein/aus
-global LoggingLevel := 1               ; 0=aus, 1=INFO, 2=DEBUG
+global LoggingLevel := 2               ; 0=aus, 1=INFO, 2=DEBUG
 global LoggingPath := FrameCompLogPath ; Pfad zur Logdatei
 global ScriptPaused := false           ; eigener Pause-Status (Hotkeys + Timer)
 
@@ -65,8 +65,10 @@ global ScriptPaused := false           ; eigener Pause-Status (Hotkeys + Timer)
 #Include ".\modules\WinSnap_LeafWindows.ahk"
 #Include ".\modules\WinSnap_Selection.ahk"
 #Include ".\modules\WinSnap_Grid.ahk"
+#Include ".\modules\WinSnap_HotkeyOverlay.ahk"
 
-TrayTip "WinSnap", "WinSnap geladen – Layouts bereit", 1500
+InitTrayIcon()
+TrayTip "WinSnap", "WinSnap geladen - Layouts bereit", 1500
 
 ; =========================
 ; Hotkeys
@@ -183,6 +185,11 @@ Esc:: {
 ; Reload-Hotkey
 ^!r::Reload()
 
+; Hotkey Overlay (anzeigen solange gedrückt) – Ctrl+Alt+/? (vkBF)
+^!vkBF:: {
+    HotkeyOverlay_Toggle()
+}
+
 ; Pause/Resume (Hotkeys und relevante Timer)
 ^!p:: {
     TogglePause()
@@ -218,4 +225,29 @@ TogglePause() {
         HideHighlight()
     TrayTip "WinSnap", newState ? "Pausiert" : "Aktiv", 1000
     LogInfo(Format("TogglePause: {}", newState ? "paused" : "resumed"))
+    UpdateTrayTooltip()
 }
+
+; --------------------
+; Tray Icon utilities
+; --------------------
+InitTrayIcon() {
+    ico := A_ScriptDir "\WinSnap.ico"
+    try {
+        if (FileExist(ico))
+            TraySetIcon(ico)
+        else
+            TraySetIcon("imageres.dll", 202)
+    }
+    catch {
+        try TraySetIcon("shell32.dll", 44)
+    }
+    UpdateTrayTooltip()
+}
+
+UpdateTrayTooltip() {
+    global ScriptPaused
+    tip := ScriptPaused ? "WinSnap — Pausiert" : "WinSnap — Aktiv"
+    try A_IconTip := tip
+}
+

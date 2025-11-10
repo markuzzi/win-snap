@@ -108,6 +108,25 @@ DebugLog(msg) {
     LogDebug(msg)
 }
 
+; --- Small helpers ---------------------------------------------------------
+StrJoin(arr, sep := "") {
+    if !(arr is Array)
+        return ""
+    out := ""
+    for i, v in arr {
+        if (i > 1)
+            out .= sep
+        out .= v
+    }
+    return out
+}
+
+TraySetToolTip(text) {
+    try {
+        A_IconTip := text
+    }
+}
+
 ; Liefert die von DWM gemeldeten Extended Frame Bounds (sichtbare Fensteraussenkanten)
 GetExtendedFrameBounds(hwnd) {
     try {
