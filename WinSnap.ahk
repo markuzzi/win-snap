@@ -47,10 +47,11 @@ global WindowSearch := {gui:"", edit:"", list:"", items:[], filtered:[], ctx:{},
 global FrameComp := Map()    ; Klassenname -> {L,T,R,B} Offsets fr Extended Frame Bounds-Kompensation
 global FrameCompDebug := true
 global FrameCompLogPath := A_ScriptDir "\WinSnap.log"
-global ActivateOnAreaSwitch := true   ; Beim Snap-Area-Wechsel Fenster fokussieren? (false = nur Auswahl/Highlight)
-global LoggingEnabled := true         ; Logging ein/aus
-global LoggingLevel := 1              ; 0=aus, 1=INFO, 2=DEBUG
+global ActivateOnAreaSwitch := true    ; Beim Snap-Area-Wechsel Fenster fokussieren? (false = nur Auswahl/Highlight)
+global LoggingEnabled := true          ; Logging ein/aus
+global LoggingLevel := 1               ; 0=aus, 1=INFO, 2=DEBUG
 global LoggingPath := FrameCompLogPath ; Pfad zur Logdatei
+global ScriptPaused := false           ; eigener Pause-Status (Hotkeys + Timer)
 
 ; =========================
 ; Module-Includes
@@ -181,3 +182,40 @@ Esc:: {
 
 ; Reload-Hotkey
 ^!r::Reload()
+
+; Pause/Resume (Hotkeys und relevante Timer)
+^!p:: {
+    TogglePause()
+}
+
+; Script beenden
+^!q:: {
+    LogInfo("ExitApp via hotkey")
+    ExitApp()
+}
+
+; Teal-Rahmen sofort ausblenden (ohne Toggle)
++^!h:: {
+    HideHighlight()
+    LogInfo("Highlight hidden via force-hotkey")
+}
+
+TogglePause() {
+    global ScriptPaused
+    newState := !ScriptPaused
+    ScriptPaused := newState
+    try {
+        Suspend(newState)
+    }
+    ; Timer steuern: Active-Highlight und AutoSnap-NewWindows
+    try {
+        SetTimer(UpdateActiveHighlight, newState ? 0 : 150)
+    }
+    try {
+        SetTimer(AutoSnap_NewlyStartedWindows, newState ? 0 : 2000)
+    }
+    if (newState)
+        HideHighlight()
+    TrayTip "WinSnap", newState ? "Pausiert" : "Aktiv", 1000
+    LogInfo(Format("TogglePause: {}", newState ? "paused" : "resumed"))
+}
