@@ -47,6 +47,7 @@ global WindowSearch := {gui:"", edit:"", list:"", items:[], filtered:[], ctx:{},
 global FrameComp := Map()    ; Klassenname -> {L,T,R,B} Offsets fr Extended Frame Bounds-Kompensation
 global FrameCompDebug := true
 global FrameCompLogPath := A_ScriptDir "\WinSnap_frame_debug.log"
+global ActivateOnAreaSwitch := true   ; Beim Snap-Area-Wechsel Fenster fokussieren? (false = nur Auswahl/Highlight)
 
 ; =========================
 ; Module-Includes

@@ -1,3 +1,4 @@
 .aider*
 /WinSnap_layouts.json
 *.log
+.vscode

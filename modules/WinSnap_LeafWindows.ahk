@@ -88,6 +88,31 @@ LeafGetTopWindow(mon, leafId) {
     if (!LeafWindows.Has(key))
         return 0
     arr := LeafWindows[key]
+    ; Baue Lookup-Set für schnelle Prüfung
+    lookup := Map()
+    for hwnd in arr
+        lookup[hwnd] := true
+
+    ; Ermittle tatsächliche Z-Order über das System und wähle das oberste Fenster dieser Leaf
+    top := 0
+    try {
+        osList := WinGetList()  ; Z-Order Reihenfolge (Top -> Bottom)
+        for hwnd in osList {
+            if (lookup.Has(hwnd)) {
+                try {
+                    if (DllCall("IsWindow", "ptr", hwnd) && WinExist("ahk_id " hwnd)) {
+                        top := hwnd
+                        break
+                    }
+                }
+            }
+        }
+    }
+
+    if (top)
+        return top
+
+    ; Fallback: Liste bereinigen und erstes gültiges nehmen
     idx := 1
     while (idx <= arr.Length) {
         hwnd := arr[idx]

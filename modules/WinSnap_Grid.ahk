@@ -257,7 +257,7 @@ AdjustBoundaryForActive(whichArrow) {
 }
 
 SwitchSnapArea(dir) {
-    global Layouts
+    global Layouts, ActivateOnAreaSwitch
     ctx := ApplyManualNavigation(GetLeafNavigationContext())
     if (!ctx.mon)
         return
@@ -275,7 +275,8 @@ SwitchSnapArea(dir) {
     if (neighbor) {
         SelectLeaf(ctx.mon, neighbor, "manual")
         target := LeafGetTopWindow(ctx.mon, neighbor)
-        if (target)
+        activateSwitch := (IsSet(ActivateOnAreaSwitch) && ActivateOnAreaSwitch)
+        if (activateSwitch && target)
             WinActivate "ahk_id " target
         else
             FlashLeafOutline(ctx.mon, neighbor)
@@ -290,7 +291,8 @@ SwitchSnapArea(dir) {
         leaf := Layouts[nextMon].root
     SelectLeaf(nextMon, leaf, "manual")
     target := LeafGetTopWindow(nextMon, leaf)
-    if (target)
+    activateSwitch := (IsSet(ActivateOnAreaSwitch) && ActivateOnAreaSwitch)
+    if (activateSwitch && target)
         WinActivate "ahk_id " target
     else
         FlashLeafOutline(nextMon, leaf)
