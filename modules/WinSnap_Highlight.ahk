@@ -2,56 +2,60 @@
 ; Highlight (roter Rahmen)
 ; =========================
 HL_Init() {
-    global HL, BorderPx
+    global HL
     if (HL.init)
         return
-    makeEdge() {
-        g := Gui("+AlwaysOnTop -Caption +ToolWindow +E0x20") ; click-through
-        g.BackColor := "Teal"
-        return g
-    }
-    HL.top   := makeEdge()
-    HL.bot   := makeEdge()
-    HL.left  := makeEdge()
-    HL.right := makeEdge()
+    g := Gui("+AlwaysOnTop -Caption +ToolWindow +E0x20 +DPIScale") ; click-through
+    g.BackColor := "Teal"
+    HL.gui := g
     HL.init := true
-    LogDebug("HL_Init: highlight edges created")
+    LogDebug("HL_Init: highlight GUI initialized")
 }
 
 ShowHighlightRect(rect) {
-    global HighlightEnabled, HL, BorderPx
+    global HL, BorderPx, HighlightEnabled
     if (!HighlightEnabled)
         return
     HL_Init()
-    x := rect.L, y := rect.T
-    w := rect.R - rect.L
-    h := rect.B - rect.T
-    LogDebug(Format("ShowHighlightRect: L={},T={},R={},B={} (w={},h={})", rect.L, rect.T, rect.R, rect.B, w, h))
-    HL.top.Move(x-1, y-1, w+2, BorderPx),      HL.top.Show("NA")
-    HL.bot.Move(x-1, y+h-1, w+2, BorderPx),    HL.bot.Show("NA")
-    HL.left.Move(x-1, y-1, BorderPx, h+2),     HL.left.Show("NA")
-    HL.right.Move(x+w-1, y-1, BorderPx, h+2),  HL.right.Show("NA")
+
+    x := rect.L
+    y := rect.T
+    w := Max(1, rect.R - rect.L)
+    h := Max(1, rect.B - rect.T)
+    radius := 12
+    border := BorderPx
+
+    ; Äußere Region (Vollgröße mit runden Ecken)
+    outerRgn := DllCall("CreateRoundRectRgn", "Int", 0, "Int", 0, "Int", w, "Int", h, "Int", radius, "Int", radius, "Ptr")
+
+    ; Innere Region (kleiner, ausgeschnitten)
+    innerRgn := DllCall("CreateRoundRectRgn", "Int", border, "Int", border, "Int", w - border, "Int", h - border, "Int", radius - border, "Int", radius - border, "Ptr")
+
+    ; Differenz bilden = nur der Rand bleibt sichtbar
+    combinedRgn := DllCall("CreateRectRgn", "Int", 0, "Int", 0, "Int", 0, "Int", 0, "Ptr")
+    DllCall("CombineRgn", "Ptr", combinedRgn, "Ptr", outerRgn, "Ptr", innerRgn, "Int", 4)  ; RGN_DIFF = 4
+
+    ; Fensterregion setzen
+    DllCall("SetWindowRgn", "Ptr", HL.gui.Hwnd, "Ptr", combinedRgn, "Int", true)
+
+    ; GUI anzeigen
+    HL.gui.Show("NA")
+    HL.gui.Move(x, y, w, h)
+
+    ; Ressourcen freigeben (nur inner & outer, combined gehört nun dem Fenster)
+    DllCall("DeleteObject", "Ptr", outerRgn)
+    DllCall("DeleteObject", "Ptr", innerRgn)
 }
 
 HideHighlight() {
     global HL, CurrentHighlight
     if (HL.init) {
-        try {
-            HL.top.Hide()
-        }
-        try {
-            HL.bot.Hide()
-        }
-        try {
-            HL.left.Hide()
-        }
-        try {
-            HL.right.Hide()
-        }
+        try HL.gui.Hide()
     }
     CurrentHighlight := {mon:0, leaf:0}
     LogDebug("HideHighlight: hidden")
 }
+
 
 ApplyLeafHighlight(mon, leafId) {
     global HighlightEnabled, CurrentHighlight, Layouts, CurrentLeafSelection

@@ -35,17 +35,22 @@ OverlayAddRect(rect, color, thickness := 0) {
         style := "+AlwaysOnTop -Caption +ToolWindow +E0x80020 +DPIScale"
         g := Gui(style)
         g.BackColor := color
-        g.Show("NA")
+        g.Show("NA")  ; NoActivate
         opacity := (IsSet(OverlayOpacity) && OverlayOpacity) ? OverlayOpacity : 150
-        try {
-            WinSetTransparent(opacity, g)
-        }
+        WinSetTransparent(opacity, g)
+
+        ; Abrundungsradius in px (z. B. 16)
+        radius := 16
+        hRgn := DllCall("CreateRoundRectRgn", "Int", 0, "Int", 0, "Int", w, "Int", h, "Int", radius, "Int", radius, "Ptr")
+        DllCall("SetWindowRgn", "Ptr", g.Hwnd, "Ptr", hRgn, "Int", true)
+
         g.Move(x, y, w, h)
         SnapOverlay.edges.Push(g)
     } catch Error as e {
         MsgBox "Fehler in OverlayAddRect:`n" e.Message
     }
 }
+
 
 
 ShowRectOverlay(rectArray, color, duration := 0) {
