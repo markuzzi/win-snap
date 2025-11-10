@@ -226,6 +226,7 @@ MoveWindow(hwnd, x, y, w, h) {
     ; Extended Frame Bounds ermitteln und ggf. korrigieren
     efb := GetExtendedFrameBounds(hwnd)
     if (efb) {
+        cacheOk := true
         ; Margins zwischen gesetztem Rechteck (x0..x0+w0) und EFB messen
         mL := efb.L - x0
         mT := efb.T - y0
@@ -240,6 +241,23 @@ MoveWindow(hwnd, x, y, w, h) {
         ; minimale Gre garantieren
         w1 := Max(1, Round(w1))
         h1 := Max(1, Round(h1))
+        ; Sanity-Check: Ausreißer erkennen (z.B. Terminal/Conhost)
+        maxSide := 60  ; px pro Seite
+        if (Abs(mL) > maxSide || Abs(mT) > maxSide || Abs(mR) > maxSide || Abs(mB) > maxSide) {
+            DebugLog("EFB correction skipped (margins out of range)")
+            x1 := x0, y1 := y0, w1 := w0, h1 := h0
+            cacheOk := false
+        } else {
+            minW := Max(100, Floor(w * 0.6))
+            minH := Max(80,  Floor(h * 0.6))
+            maxW := Ceil(w * 1.6)
+            maxH := Ceil(h * 1.6)
+            if (w1 < minW || h1 < minH || w1 > maxW || h1 > maxH) {
+                DebugLog("EFB correction skipped (bad corrected size)")
+                x1 := x0, y1 := y0, w1 := w0, h1 := h0
+                cacheOk := false
+            }
+        }
         ; Nur bewegen, wenn sich etwas ndert
         if (x1 != x0 || y1 != y0 || w1 != w0 || h1 != h0) {
             try {
@@ -251,7 +269,7 @@ MoveWindow(hwnd, x, y, w, h) {
         }
         ; Cache pro Klasse/Prozess ablegen (mit Vorzeichen)
         try {
-            if (cacheKey != ":unknown:0") {
+            if (cacheOk && cacheKey != ":unknown:0") {
                 FrameComp[cacheKey] := { L:mL, T:mT, R:mR, B:mB }
                 DebugLog(Format("Cached margins for key {}: L={},T={},R={},B={}", cacheKey, mL, mT, mR, mB))
             }
