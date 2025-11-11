@@ -135,6 +135,24 @@ Esc:: {
     WinMinimize "ahk_id " hwnd
 }
 
+; Win+Shift+Right: Fenster auf rechte Nachbar-Area erweitern
+#+Right:: {
+    ExpandWindowAcrossNeighbor("right")
+}
+
+; Win+Shift+Left: Fenster auf linke Nachbar-Area erweitern oder Reduktion bei vorheriger Rechts-Expansion
+#+Left:: {
+    ExpandWindowAcrossNeighbor("left")
+}
+
+; Alternative Vertikal-Expansion (Konflikt: #+Up/# +Down belegt)
+#^+Up:: {
+    ExpandWindowAcrossNeighbor("up")
+}
+#^+Down:: {
+    ExpandWindowAcrossNeighbor("down")
+}
+
 ; Alt+Pfeile: Snap-Area wechseln (oberstes Fenster aktivieren)
 !Left::  SwitchSnapArea("left")
 !Right:: SwitchSnapArea("right")

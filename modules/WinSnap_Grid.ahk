@@ -538,3 +538,82 @@ SetLastDirection(hwnd, dir) {
         LastDir[hwnd] := "bottom"
 }
 
+; Expand current window to span its leaf and its neighbor in the given direction (simple version)
+ExpandWindowAcrossNeighbor(dir) {
+    ExpandOrReduceWindow(dir)
+}
+
+; Enhanced expansion with state and reduction support
+global ExpandedWindows := Map() ; hwnd -> { mon, baseLeaf, dir, neighbor, attached }
+
+OppositeDir(dir) {
+    if (dir = "left")
+        return "right"
+    if (dir = "right")
+        return "left"
+    if (dir = "up")
+        return "down"
+    if (dir = "down")
+        return "up"
+    return ""
+}
+
+ExpandOrReduceWindow(dir) {
+    global WinToLeaf, Layouts, ExpandedWindows
+    win := GetActiveWindow()
+    if (!win)
+        return
+    hwnd := win.hwnd
+    monInfo := GetMonitorIndexAndArea(hwnd)
+    mon := monInfo.index
+    Layout_Ensure(mon)
+
+    ; If already expanded and requested dir is opposite -> reduce
+    if (ExpandedWindows.Has(hwnd)) {
+        st := ExpandedWindows[hwnd]
+        if (st.mon != mon) {
+            ExpandedWindows.Delete(hwnd)
+        } else if (OppositeDir(dir) = st.dir) {
+            if (st.attached) {
+                SnapToLeaf(hwnd, st.mon, st.baseLeaf)
+            } else {
+                r := GetLeafRectPx(st.mon, st.baseLeaf)
+                EnsureHistory(hwnd)
+                MoveWindow(hwnd, r.L, r.T, r.R - r.L, r.B - r.T)
+                try ApplyLeafHighlight(st.mon, st.baseLeaf)
+            }
+            ExpandedWindows.Delete(hwnd)
+            LogInfo(Format("ExpandOrReduceWindow: reduced hwnd={} back to leaf {}", hwnd, st.baseLeaf))
+            return
+        }
+    }
+
+    baseLeaf := 0
+    attached := false
+    if (WinToLeaf.Has(hwnd) && WinToLeaf[hwnd].mon = mon) {
+        baseLeaf := WinToLeaf[hwnd].leaf
+        attached := true
+    }
+    if (!baseLeaf) {
+        cx := win.x + win.w/2
+        cy := win.y + win.h/2
+        baseLeaf := Layout_FindLeafAtPoint(mon, cx, cy)
+    }
+    if (!baseLeaf)
+        baseLeaf := Layouts[mon].root
+
+    neighbor := FindNeighborLeaf(mon, baseLeaf, dir)
+    if (!neighbor)
+        return
+
+    rA := Layout_NodeRect(mon, baseLeaf)
+    rB := Layout_NodeRect(mon, neighbor)
+    combined := { L:Min(rA.L, rB.L), T:Min(rA.T, rB.T), R:Max(rA.R, rB.R), B:Max(rA.B, rB.B) }
+    combined := ApplySnapGap(combined)
+
+    EnsureHistory(hwnd)
+    MoveWindow(hwnd, combined.L, combined.T, combined.R - combined.L, combined.B - combined.T)
+    try ApplyLeafHighlight(mon, baseLeaf)
+    ExpandedWindows[hwnd] := { mon:mon, baseLeaf:baseLeaf, dir:dir, neighbor:neighbor, attached:attached }
+    LogInfo(Format("ExpandOrReduceWindow: hwnd={}, mon={}, base leaf {} + neighbor {} (dir={})", hwnd, mon, baseLeaf, neighbor, dir))
+}
