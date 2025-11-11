@@ -95,6 +95,14 @@ LogWrite(levelNum, levelName, msg) {
     }
 }
 
+LogError(msg) {
+    LogWrite(-1, "ERROR", msg)
+}
+
+LogWarn(msg) {
+    LogWrite(0, "WARN", msg)
+}
+
 LogInfo(msg) {
     LogWrite(1, "INFO", msg)
 }

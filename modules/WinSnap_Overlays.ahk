@@ -26,30 +26,68 @@ OverlayAddRect(rect, color, thickness := 0) {
     global SnapOverlay, OverlayOpacity
     OverlayEnsure()
 
+    ; --- Validierung ---
+    if (!IsObject(rect)) {
+        LogError("OverlayAddRect: rect is not an object!")
+        return
+    }
+    if (!rect.HasOwnProp("L") || !rect.HasOwnProp("T") || !rect.HasOwnProp("R") || !rect.HasOwnProp("B")) {
+        LogError("OverlayAddRect: rect is missing required properties (L, T, R, B)")
+        return
+    }
+
     x := Round(rect.L)
     y := Round(rect.T)
     w := Max(1, Round(rect.R - rect.L))
     h := Max(1, Round(rect.B - rect.T))
+
+    if (w <= 0 || h <= 0) {
+        LogWarn(Format("OverlayAddRect: Ignoring rectangle with invalid size (w={}, h={})", w, h))
+        return
+    }
+
+    if (color = "") {
+        LogWarn("OverlayAddRect: No color specified, defaulting to 'Lime'")
+        color := "Lime"
+    }
+
+    ; --- Abrundungsradius & Transparenz vorbereiten ---
+    radius := 16
+    opacity := (IsSet(OverlayOpacity) && OverlayOpacity > 0) ? OverlayOpacity : 150
 
     try {
         style := "+AlwaysOnTop -Caption +ToolWindow +E0x80020 +DPIScale"
         g := Gui(style)
         g.BackColor := color
         g.Show("NA")  ; NoActivate
-        opacity := (IsSet(OverlayOpacity) && OverlayOpacity) ? OverlayOpacity : 150
         WinSetTransparent(opacity, g)
 
-        ; Abrundungsradius in px (z. B. 16)
-        radius := 16
+        ; --- Rounded Region erstellen ---
         hRgn := DllCall("CreateRoundRectRgn", "Int", 0, "Int", 0, "Int", w, "Int", h, "Int", radius, "Int", radius, "Ptr")
-        DllCall("SetWindowRgn", "Ptr", g.Hwnd, "Ptr", hRgn, "Int", true)
+        if (!hRgn) {
+            LogError("OverlayAddRect: Failed to create region via CreateRoundRectRgn")
+            g.Destroy()
+            return
+        }
+
+        success := DllCall("SetWindowRgn", "Ptr", g.Hwnd, "Ptr", hRgn, "Int", true)
+        if (!success) {
+            LogError("OverlayAddRect: SetWindowRgn failed for hwnd=" g.Hwnd)
+            DllCall("DeleteObject", "Ptr", hRgn)
+            g.Destroy()
+            return
+        }
 
         g.Move(x, y, w, h)
         SnapOverlay.edges.Push(g)
+        LogDebug(Format("OverlayAddRect: success (x={}, y={}, w={}, h={}, color={}, opacity={}, radius={})", x, y, w, h, color, opacity, radius))
+
     } catch Error as e {
-        MsgBox "Fehler in OverlayAddRect:`n" e.Message
+        LogError("OverlayAddRect: Exception occurred → " . e.Message)
+        try g.Destroy()
     }
 }
+
 
 
 

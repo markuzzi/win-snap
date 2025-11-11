@@ -81,7 +81,11 @@ ApplyLeafHighlight(mon, leafId) {
 }
 
 UpdateActiveHighlight(*) {
-    global WinToLeaf, WindowSearch
+    global WinToLeaf, WindowSearch, DragSnap
+    try {
+        if (IsSet(DragSnap) && DragSnap.active)
+            return
+    }
     manual := GetManualNavigationContext()
     if (manual.mon) {
         ApplyLeafHighlight(manual.mon, manual.leaf)
@@ -102,7 +106,7 @@ UpdateActiveHighlight(*) {
         monInfo := GetMonitorIndexAndArea(hwnd)
         SelectLeaf(monInfo.index, 0, "auto")
     }
-    LogDebug("UpdateActiveHighlight tick")
+    LogTrace("UpdateActiveHighlight tick")
 }
 
 UpdateActiveHighlight()
