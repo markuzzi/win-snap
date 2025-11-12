@@ -1,6 +1,9 @@
 ; =========================
 ; Leaf Selection & Navigation
 ; =========================
+; Steuert, ob LeafRecordActivation die Reihenfolge der Fensterliste umsortiert.
+; Wird von CycleWindowInLeaf temporaer gesetzt, um toggling zu vermeiden.
+global SuppressActivationReorder := false
 ; Prueft, ob die Leaf-Area Fenster enthaelt.
 LeafHasWindows(mon, leafId) {
     global LeafWindows
@@ -63,6 +66,32 @@ LeafRecordActivation(hwnd) {
     if (!LeafWindows.Has(key))
         LeafWindows[key] := []
     arr := LeafWindows[key]
+    ; Wenn Unterdrueckung aktiv ist, Liste nur bereinigen und sicherstellen,
+    ; dass hwnd enthalten ist, ohne die Reihenfolge zu verschieben.
+    if (IsSet(SuppressActivationReorder) && SuppressActivationReorder) {
+        found := false
+        idx := 1
+        while (idx <= arr.Length) {
+            current := arr[idx]
+            try {
+                exists := WinExist("ahk_id " current)
+            } catch {
+                exists := false
+            }
+            if (current = hwnd)
+                found := true
+            if (!exists) {
+                arr.RemoveAt(idx)
+                continue
+            }
+            idx++
+        }
+        if (!found)
+            arr.Push(hwnd)
+        SelectLeaf(info.mon, info.leaf, "auto")
+        return
+    }
+    ; Standard: Aktiviertes Fenster nach vorn ziehen.
     idx := 1
     while (idx <= arr.Length) {
         current := arr[idx]

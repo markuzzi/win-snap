@@ -278,10 +278,12 @@ SwitchSnapArea(dir) {
     Layout_Ensure(ctx.mon)
     if (!ctx.leaf) {
         sel := GetSelectedLeaf(ctx.mon)
-        if (sel)
+        if (sel) {
             ctx.leaf := sel
-        else
-            ctx.leaf := Layouts[ctx.mon].root
+        } else {
+            Layout_SelectFirstLeaf(ctx.mon)
+            ctx.leaf := GetSelectedLeaf(ctx.mon)
+        }
     }
     if (!ctx.leaf)
         return
@@ -301,8 +303,10 @@ SwitchSnapArea(dir) {
         return
     Layout_Ensure(nextMon)
     leaf := GetSelectedLeaf(nextMon)
-    if (!leaf)
-        leaf := Layouts[nextMon].root
+    if (!leaf) {
+        Layout_SelectFirstLeaf(nextMon)
+        leaf := GetSelectedLeaf(nextMon)
+    }
     SelectLeaf(nextMon, leaf, "manual")
     target := LeafGetTopWindow(nextMon, leaf)
     activateSwitch := (IsSet(ActivateOnAreaSwitch) && ActivateOnAreaSwitch)
@@ -383,9 +387,22 @@ CycleWindowInLeaf(direction) {
     else
         idx := (idx = 1) ? arr.Length : idx - 1
     target := arr[idx]
-    if (WinExist("ahk_id " target))
+    if (WinExist("ahk_id " target)) {
+        ; Unterdruecke reorder in LeafRecordActivation waehrend des Cycle-Aktivierens
+        global SuppressActivationReorder
+        SuppressActivationReorder := true
         WinActivate "ahk_id " target
+        ; Nach kurzer Zeit wieder freigeben (Ticker fuer Highlight laeuft alle ~150ms)
+        try SetTimer(ClearCycleReorderSuppression, -250)
+    }
     LogInfo(Format("CycleWindowInLeaf: direction={}, activated hwnd={}", direction, target))
+}
+
+ClearCycleReorderSuppression(*) {
+    try {
+        global SuppressActivationReorder
+        SuppressActivationReorder := false
+    }
 }
 
 ; Entfernt die aktuelle Leaf-Area und promoted das Geschwister (Fenster werden umgezogen).
