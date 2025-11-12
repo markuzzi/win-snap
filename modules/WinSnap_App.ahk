@@ -10,12 +10,21 @@ TogglePause() {
     try {
         Suspend(newState)
     }
+    catch {
+        LogError("TogglePause: Suspend failed")
+    }
     ; Timer steuern: Active-Highlight und AutoSnap-NewWindows
     try {
         SetTimer(UpdateActiveHighlight, newState ? 0 : 150)
     }
+    catch {
+        LogError("TogglePause: SetTimer(UpdateActiveHighlight) failed")
+    }
     try {
         SetTimer(AutoSnap_NewlyStartedWindows, newState ? 0 : 2000)
+    }
+    catch {
+        LogError("TogglePause: SetTimer(AutoSnap_NewlyStartedWindows) failed")
     }
     if (newState)
         HideHighlight()
@@ -44,7 +53,12 @@ InitTrayIcon() {
             TraySetIcon("imageres.dll", 202)
     }
     catch {
-        try TraySetIcon("shell32.dll", 44)
+        try {
+            TraySetIcon("shell32.dll", 44)
+        }
+        catch {
+            LogError("InitTrayIcon: TraySetIcon fallback failed")
+        }
     }
     UpdateTrayTooltip()
 }
@@ -53,7 +67,12 @@ InitTrayIcon() {
 UpdateTrayTooltip() {
     global ScriptPaused
     tip := ScriptPaused ? "WinSnap - Pausiert" : "WinSnap - Aktiv"
-    try A_IconTip := tip
+    try {
+        A_IconTip := tip
+    }
+    catch {
+        LogError("UpdateTrayTooltip: setting tooltip failed")
+    }
 }
 
 ; Zeigt einen TrayTip fuer eine begrenzte Zeit und blendet ihn danach aus.
@@ -64,14 +83,24 @@ ShowTrayTip(msg, ms := 1500, icon := "") {
         else
             TrayTip "WinSnap", msg
     }
+    catch {
+        LogError("ShowTrayTip: TrayTip failed")
+    }
     try {
         if (ms > 0)
             SetTimer(ShowTrayTip_Hide, -ms)
+    }
+    catch {
+        LogError("ShowTrayTip: SetTimer failed")
     }
 }
 
 ; Blendet den aktuell angezeigten TrayTip aus.
 ShowTrayTip_Hide() {
-    try TrayTip()
+    try {
+        TrayTip()
+    }
+    catch {
+        LogError("ShowTrayTip_Hide: TrayTip hide failed")
+    }
 }
-

@@ -75,8 +75,10 @@ WindowSearch_Open() {
     try {
         WindowSearch.gui.Show("AutoSize")
         WindowSearch.gui.GetPos(, , &guiW, &guiH)
-    } catch {
+    }
+    catch {
         guiW := 420, guiH := 260
+        LogError("WindowSearch_Open: Show/GetPos failed")
     }
     gx := rect.L + ((rect.R - rect.L) - guiW) / 2
     gy := rect.T + 40
@@ -84,6 +86,9 @@ WindowSearch_Open() {
         WindowSearch.gui.Move(Round(gx), Round(gy))
         WindowSearch.gui.Show()
         WindowSearch.edit.Focus()
+    }
+    catch {
+        LogError("WindowSearch_Open: Move/Show/Focus failed")
     }
     LogInfo(Format("WindowSearch_Open: mon={}, leaf={}, items={} ", ctx.mon, ctx.leaf, WindowSearch.items.Length))
 }
@@ -95,6 +100,9 @@ WindowSearch_Close() {
         return
     try {
         WindowSearch.gui.Hide()
+    }
+    catch {
+        LogError("WindowSearch_Close: Hide failed")
     }
     WindowSearch.active := false
     LogInfo("WindowSearch_Close")

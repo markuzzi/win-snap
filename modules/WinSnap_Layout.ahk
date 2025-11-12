@@ -153,6 +153,9 @@ GetLeafRect(mon, leafId) {
             }
         }
     }
+    catch {
+        LogError("GetLeafRect: failed to apply pills top reserve")
+    }
     return rect
 }
 
@@ -591,6 +594,9 @@ FindWindow(exe, title := "") {
             if (thisExe = exe && (title = "" || InStr(thisTitle, title)))
                 return hwnd
         }
+        catch {
+            LogError("FindWindow: query failed")
+        }
     }
     return 0
 }
@@ -667,7 +673,12 @@ Layout_ClearMonitorState(mon) {
             CurrentLeafSelection.Delete(mon)
     }
     ; Manuelle Navigation und ggf. aktives Highlight fr diesen Monitor zurcksetzen
-    try ManualNav_Clear(mon)
+    try {
+        ManualNav_Clear(mon)
+    }
+    catch {
+        LogError("Layout_ResetMonitor: ManualNav_Clear failed")
+    }
     try {
         if (CurrentHighlight.mon = mon)
             HideHighlight()

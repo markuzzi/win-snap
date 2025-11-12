@@ -113,8 +113,14 @@ LeafGetTopWindow(mon, leafId) {
                         break
                     }
                 }
+                catch {
+                    ; ignore invalid handle
+                }
             }
         }
+    }
+    catch {
+        LogError("LeafGetTopWindow: WinGetList failed")
     }
 
     if (top) {

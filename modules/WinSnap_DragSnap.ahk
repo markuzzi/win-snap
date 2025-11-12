@@ -39,7 +39,9 @@ DragSnap_Start() {
     CoordMode "Mouse", "Screen"
     try {
         MouseGetPos &mx, &my, &hUnder
-    } catch {
+    }
+    catch {
+        LogError("DragSnap_Start: MouseGetPos failed")
         return
     }
     if (!hUnder)
@@ -48,6 +50,9 @@ DragSnap_Start() {
     try {
         if (!IsCollectibleSnapWindow(hUnder))
             return
+    }
+    catch {
+        LogError("DragSnap_Start: IsCollectibleSnapWindow failed")
     }
     mon := FindMonitorByPoint(mx, my)
     if (!mon)
@@ -62,8 +67,18 @@ DragSnap_Start() {
     DragSnap.lastLeaf := leaf
     DragSnap_UpdateOverlay(mon, leaf)
     ; also move regular highlight to mouse leaf
-    try ApplyLeafHighlight(mon, leaf)
-    try SetTimer(DragSnap_Tick, DragSnapTimerMs)
+    try {
+        ApplyLeafHighlight(mon, leaf)
+    }
+    catch {
+        LogError("DragSnap_Start: ApplyLeafHighlight failed")
+    }
+    try {
+        SetTimer(DragSnap_Tick, DragSnapTimerMs)
+    }
+    catch {
+        LogError("DragSnap_Start: SetTimer failed")
+    }
     LogInfo(Format("DragSnap_Start: hwnd={}, mon={}, leaf={}", hUnder, mon, leaf))
 }
 
@@ -71,7 +86,12 @@ DragSnap_Start() {
 DragSnap_Tick(*) {
     global DragSnap
     if (!DragSnap.active) {
-        try SetTimer(DragSnap_Tick, 0)
+        try {
+            SetTimer(DragSnap_Tick, 0)
+        }
+        catch {
+            LogError("DragSnap_Tick: stop timer failed")
+        }
         return
     }
     if (!GetKeyState("LButton", "P")) {
@@ -82,7 +102,9 @@ DragSnap_Tick(*) {
     CoordMode "Mouse", "Screen"
     try {
         MouseGetPos &mx, &my
-    } catch {
+    }
+    catch {
+        LogError("DragSnap_Tick: MouseGetPos failed")
         return
     }
     mon := FindMonitorByPoint(mx, my)
@@ -97,7 +119,12 @@ DragSnap_Tick(*) {
         DragSnap.lastMon := mon
         DragSnap_UpdateOverlay(mon, leaf)
         ; keep highlight following the mouse
-        try ApplyLeafHighlight(mon, leaf)
+        try {
+            ApplyLeafHighlight(mon, leaf)
+        }
+        catch {
+            LogError("DragSnap_Tick: ApplyLeafHighlight failed")
+        }
         LogTrace(Format("DragSnap_Tick: mon={}, leaf={} (updated)", mon, leaf))
     }
 }
@@ -114,7 +141,12 @@ DragSnap_Drop() {
     global DragSnap
     if (!DragSnap.active)
         return
-    try SetTimer(DragSnap_Tick, 0)
+    try {
+        SetTimer(DragSnap_Tick, 0)
+    }
+    catch {
+        LogError("DragSnap_Drop: stop timer failed")
+    }
     HideSnapOverlay()
     hwnd := DragSnap.hwnd
     mon := DragSnap.lastMon
@@ -125,16 +157,29 @@ DragSnap_Drop() {
         return
     try {
         ; Safety: release mouse capture if any remains
-        try DllCall("ReleaseCapture")
+        try {
+            DllCall("ReleaseCapture")
+        }
+        catch {
+            LogError("DragSnap_Drop: ReleaseCapture failed")
+        }
         SnapToLeaf(hwnd, mon, leaf)
         LogInfo(Format("DragSnap_Drop: snapped hwnd={} to mon={}, leaf={}", hwnd, mon, leaf))
+    }
+    catch {
+        LogError("DragSnap_Drop: snapping failed")
     }
 }
 
 ; Bricht DragSnap ab, blendet Overlays aus und setzt Status zurueck.
 DragSnap_Cancel() {
     global DragSnap
-    try SetTimer(DragSnap_Tick, 0)
+    try {
+        SetTimer(DragSnap_Tick, 0)
+    }
+    catch {
+        LogError("DragSnap_Cancel: stop timer failed")
+    }
     HideSnapOverlay()
     DragSnap.active := false
     DragSnap.hwnd := 0

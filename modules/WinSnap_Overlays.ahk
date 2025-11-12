@@ -1,4 +1,4 @@
-; =========================
+﻿; =========================
 ; WinSnap_Overlays.ahk (optimiert, nutzt Utils.GetLeafRectPx)
 ; =========================
 
@@ -18,6 +18,9 @@ OverlayClear() {
     for edge in SnapOverlay.edges {
         try {
             edge.Destroy()
+        }
+        catch {
+            LogError("OverlayClear: edge.Destroy failed")
         }
     }
     SnapOverlay.edges := []
@@ -87,7 +90,12 @@ OverlayAddRect(rect, color, thickness := 0) {
 
     } catch Error as e {
         LogError("OverlayAddRect: Exception occurred → " . e.Message)
-        try g.Destroy()
+        try {
+            g.Destroy()
+        }
+        catch {
+            ; ignore
+        }
     }
 }
 
@@ -102,11 +110,17 @@ ShowRectOverlay(rectArray, color, duration := 0) {
         try {
             OverlayAddRect(rect, color)
         }
+        catch {
+            LogError("ShowRectOverlay: OverlayAddRect failed")
+        }
     }
 
     if (duration > 0)
         try {
             SetTimer(HideSnapOverlay, -Abs(duration))
+        }
+        catch {
+            LogError("ShowRectOverlay: SetTimer failed")
         }
     LogInfo(Format("ShowRectOverlay: count={}, color={}, duration={}ms", rectArray.Length, color, duration))
 }
@@ -143,3 +157,8 @@ ShowAllSnapAreasForMonitor(mon) {
     ShowRectOverlay(arr, OverlayColor, OverlayDuration)
     LogInfo(Format("ShowAllSnapAreasForMonitor: mon={}, count={}", mon, arr.Length))
 }
+
+
+
+
+

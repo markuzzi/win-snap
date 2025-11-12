@@ -53,7 +53,12 @@ ShowHighlightRect(rect) {
 HideHighlight() {
     global HL, CurrentHighlight
     if (HL.init) {
-        try HL.gui.Hide()
+        try {
+            HL.gui.Hide()
+        }
+        catch {
+            LogError("HideHighlight: gui.Hide failed")
+        }
     }
     CurrentHighlight := {mon:0, leaf:0}
     LogDebug("HideHighlight: hidden")
@@ -90,6 +95,9 @@ UpdateActiveHighlight(*) {
     try {
         if (IsSet(DragSnap) && DragSnap.active)
             return
+    }
+    catch {
+        LogError("UpdateActiveHighlight: DragSnap check failed")
     }
     manual := GetManualNavigationContext()
     if (manual.mon) {

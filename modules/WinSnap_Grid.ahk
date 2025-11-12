@@ -247,7 +247,13 @@ AdjustBoundaryForActive(whichArrow) {
     parent := 0
     if (neighbor) {
         ; Exakte Trenn-Grenze zwischen leaf und (rechten) Nachbarn finden
-        try parent := Layout_FindAxisSplitBetweenLeaves(mon, leaf, neighbor, axis)
+        try {
+            parent := Layout_FindAxisSplitBetweenLeaves(mon, leaf, neighbor, axis)
+        }
+        catch {
+            parent := 0
+            LogError("AdjustBoundaryForActive: find split between leaves failed")
+        }
     }
 
     if (parent = 0) {
@@ -465,7 +471,12 @@ CycleWindowInLeaf(direction) {
         SuppressActivationReorder := true
         WinActivate "ahk_id " target
         ; Nach kurzer Zeit wieder freigeben (Ticker fuer Highlight laeuft alle ~150ms)
-        try SetTimer(ClearCycleReorderSuppression, -250)
+        try {
+            SetTimer(ClearCycleReorderSuppression, -250)
+        }
+        catch {
+            LogError("CycleWindowInLeaf: SetTimer failed")
+        }
     }
     LogInfo(Format("CycleWindowInLeaf: direction={}, activated hwnd={}", direction, target))
 }
@@ -474,6 +485,9 @@ ClearCycleReorderSuppression(*) {
     try {
         global SuppressActivationReorder
         SuppressActivationReorder := false
+    }
+    catch {
+        LogError("ClearCycleReorderSuppression: failed")
     }
 }
 
@@ -689,7 +703,12 @@ ExpandOrReduceWindow(dir) {
                 r := GetLeafRectPx(st.mon, st.baseLeaf)
                 EnsureHistory(hwnd)
                 MoveWindow(hwnd, r.L, r.T, r.R - r.L, r.B - r.T)
-                try ApplyLeafHighlight(st.mon, st.baseLeaf)
+            try {
+                ApplyLeafHighlight(st.mon, st.baseLeaf)
+            }
+            catch {
+                LogError("ExpandOrReduceWindow: ApplyLeafHighlight failed (reduce)")
+            }
             }
             ExpandedWindows.Delete(hwnd)
             LogInfo(Format("ExpandOrReduceWindow: reduced hwnd={} back to leaf {}", hwnd, st.baseLeaf))
@@ -737,10 +756,18 @@ ExpandOrReduceWindow(dir) {
             }
         }
     }
+    catch {
+        LogError("ExpandOrReduceWindow: pills reserve apply failed")
+    }
 
     EnsureHistory(hwnd)
     MoveWindow(hwnd, combined.L, combined.T, combined.R - combined.L, combined.B - combined.T)
-    try ApplyLeafHighlight(mon, baseLeaf)
+    try {
+        ApplyLeafHighlight(mon, baseLeaf)
+    }
+    catch {
+        LogError("ExpandOrReduceWindow: ApplyLeafHighlight failed")
+    }
     ExpandedWindows[hwnd] := { mon:mon, baseLeaf:baseLeaf, dir:dir, neighbor:neighbor, attached:attached }
     LogInfo(Format("ExpandOrReduceWindow: hwnd={}, mon={}, base leaf {} + neighbor {} (dir={})", hwnd, mon, baseLeaf, neighbor, dir))
 }

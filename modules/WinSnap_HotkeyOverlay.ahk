@@ -12,7 +12,12 @@ HotkeyOverlay_Init() {
     g := Gui("+AlwaysOnTop -Caption +ToolWindow +E0x20 +DPIScale") ; click-through overlay
     g.BackColor := "Black"
     ; Transparenz
-    try WinSetTransparent(200, g) ; 0..255
+    try {
+        WinSetTransparent(200, g) ; 0..255
+    }
+    catch {
+        LogError("HotkeyOverlay_Init: WinSetTransparent failed")
+    }
     ; Inhalte
     fontTitle := "s16 cWhite Bold"
     fontItem := "s12 cWhite"
@@ -62,7 +67,12 @@ HotkeyOverlay_BuildText() {
 HotkeyOverlay_UpdateText() {
     global HotkeyOverlay
     if (HotkeyOverlay.gui) {
-        try HotkeyOverlay.text.Value := HotkeyOverlay_BuildText()
+        try {
+            HotkeyOverlay.text.Value := HotkeyOverlay_BuildText()
+        }
+        catch {
+            LogError("HotkeyOverlay_UpdateText: updating text failed")
+        }
     }
 }
 
@@ -90,9 +100,17 @@ HotkeyOverlay_Show() {
         HotkeyOverlay.gui.Move(Round(x), Round(y))
         HotkeyOverlay.gui.Show()
         ; Apply rounded corners (best effort)
-        try HotkeyOverlay_ApplyRounded(HotkeyOverlay.gui)
+        try {
+            HotkeyOverlay_ApplyRounded(HotkeyOverlay.gui)
+        }
+        catch {
+            LogError("HotkeyOverlay_Show: ApplyRounded failed")
+        }
         HotkeyOverlay.shown := true
         LogInfo("HotkeyOverlay_Show")
+    }
+    catch {
+        LogError("HotkeyOverlay_Show: move/show failed")
     }
 }
 
@@ -103,7 +121,12 @@ HotkeyOverlay_Hide(force := false) {
         return
     if (!force && HotkeyOverlay.toggleMode)
         return
-    try HotkeyOverlay.gui.Hide()
+    try {
+        HotkeyOverlay.gui.Hide()
+    }
+    catch {
+        LogError("HotkeyOverlay_Hide: hide failed")
+    }
     HotkeyOverlay.shown := false
     LogInfo("HotkeyOverlay_Hide")
 }
@@ -132,6 +155,9 @@ HotkeyOverlay_ApplyRounded(gui) {
         DllCall("dwmapi\\DwmSetWindowAttribute", "ptr", hwnd, "int", 33, "ptr", &pref, "int", 4, "int")
         return
     }
+    catch {
+        LogError("HotkeyOverlay_ApplyRounded failed with DwmSetWindowAttribute")
+    }
     ; Fallback: apply rounded region
     try {
         gui.GetPos(, , &w, &h)
@@ -139,5 +165,8 @@ HotkeyOverlay_ApplyRounded(gui) {
         rgn := DllCall("gdi32\\CreateRoundRectRgn", "int", 0, "int", 0, "int", w, "int", h, "int", radius, "int", radius, "ptr")
         if (rgn)
             DllCall("user32\\SetWindowRgn", "ptr", hwnd, "ptr", rgn, "int", true)
+    }
+    catch {
+        LogError("HotkeyOverlay_ApplyRounded failed with CreateRoundRectRgn and SetWindowRgn")
     }
 }

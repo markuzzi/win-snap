@@ -99,6 +99,9 @@ LogWrite(levelNum, levelName, msg) {
         stamp := FormatTime(, "yyyy-MM-dd HH:mm:ss")
         FileAppend(stamp " | " levelName " | " msg "`n", path, "UTF-8")
     }
+    catch {
+        ; Avoid recursive logging here
+    }
 }
 
 ; Loggt eine Meldung auf Level ERROR.
@@ -282,6 +285,10 @@ MoveWindow(hwnd, x, y, w, h) {
         mi := GetMonitorIndexAndArea(hwnd)
         monIdx := mi.index
     }
+    catch {
+        monIdx := 0
+        DebugLog("GetMonitorIndexAndArea failed in MoveWindow")
+    }
     cacheKey := className ":" procName ":" monIdx
     DebugLog(Format("MoveWindow start hwnd={}, class={}, proc={}, key={}, policy={}, target=({}, {}, {}, {})", hwnd, className, procName, cacheKey, policy, x, y, w, h))
 
@@ -299,6 +306,9 @@ MoveWindow(hwnd, x, y, w, h) {
         } else if (policy != "full") {
             DebugLog("Skip cached offset due to EFB override policy")
         }
+    }
+    catch {
+        DebugLog("FrameComp cache lookup failed")
     }
 
     ; Erster Move (ggf. bereits kompensiert)
@@ -368,6 +378,9 @@ MoveWindow(hwnd, x, y, w, h) {
             try {
                 WinMove x1, y1, w1, h1, "ahk_id " hwnd
             }
+            catch {
+                DebugLog("WinMove corrected failed")
+            }
             Sleep 10
         } else {
             DebugLog("No EFB correction needed (margins 0)")
@@ -378,6 +391,9 @@ MoveWindow(hwnd, x, y, w, h) {
                 FrameComp[cacheKey] := { L:mL, T:mT, R:mR, B:mB }
                 DebugLog(Format("Cached margins for key {}: L={},T={},R={},B={}", cacheKey, mL, mT, mR, mB))
             }
+        }
+        catch {
+            DebugLog("FrameComp cache store failed")
         }
         } else {
             DebugLog("EFB unavailable; skip correction")
@@ -393,6 +409,9 @@ MoveWindow(hwnd, x, y, w, h) {
                 ApplyLeafHighlight(info.mon, info.leaf)
             }
         }
+    }
+    catch {
+        DebugLog("ApplyLeafHighlight after MoveWindow failed")
     }
 
     DebugLog("MoveWindow end OK")

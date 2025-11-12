@@ -57,7 +57,7 @@ global ScriptPaused := false           ; eigener Pause-Status (Hotkeys + Timer)
 global SuppressMoveHighlight := false  ; unterdrückt Highlight während Massen-Moves
 
 ; Window Pills Overlay (config)
-global WindowPillsEnabled := false     ; Anzeige der Fenster-Pills über SnapAreas
+global WindowPillsEnabled := true      ; Anzeige der Fenster-Pills über SnapAreas
 global WindowPillsMaxTitle := 20       ; Max. Zeichen pro Titel (abschneiden mit …)
 global WindowPillsOpacity := 220       ; 0..255
 global WindowPillsRadius := 10         ; Rundung der Ecken
