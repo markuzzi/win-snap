@@ -54,6 +54,7 @@ global LoggingEnabled := true          ; Logging ein/aus
 global LoggingLevel := 1               ; 0=aus, 1=INFO, 2=DEBUG, 3=TRACE
 global LoggingPath := FrameCompLogPath ; Pfad zur Logdatei
 global ScriptPaused := false           ; eigener Pause-Status (Hotkeys + Timer)
+global SuppressMoveHighlight := false  ; unterdrückt Highlight während Massen-Moves
 
 ; Window Pills Overlay (config)
 global WindowPillsEnabled := false     ; Anzeige der Fenster-Pills über SnapAreas

@@ -384,12 +384,14 @@ MoveWindow(hwnd, x, y, w, h) {
         }
     }
 
-    ; Highlight reaktivieren, falls bekanntem Leaf zugeordnet
+    ; Highlight reaktivieren, falls bekanntem Leaf zugeordnet (optional unterdrückt)
     try {
-        global WinToLeaf
-        if (WinToLeaf.Has(hwnd)) {
-            info := WinToLeaf[hwnd]
-            ApplyLeafHighlight(info.mon, info.leaf)
+        global WinToLeaf, SuppressMoveHighlight
+        if (!IsSet(SuppressMoveHighlight) || !SuppressMoveHighlight) {
+            if (WinToLeaf.Has(hwnd)) {
+                info := WinToLeaf[hwnd]
+                ApplyLeafHighlight(info.mon, info.leaf)
+            }
         }
     }
 

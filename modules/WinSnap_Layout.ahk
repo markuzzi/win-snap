@@ -319,7 +319,9 @@ IsDescendant(mon, needle, rootId) {
 
 ; Wendet die aktuellen Rechtecke auf alle Fenster des Teilbaums erneut an.
 ReapplySubtree(mon, nodeId) {
-    global WinToLeaf, Layouts
+    global WinToLeaf, Layouts, SuppressMoveHighlight
+    wasSuppressed := (IsSet(SuppressMoveHighlight) && SuppressMoveHighlight)
+    SuppressMoveHighlight := true
     leaves := Layout_LeavesUnder(mon, nodeId)
     set := Map()
     for id in leaves
@@ -330,6 +332,7 @@ ReapplySubtree(mon, nodeId) {
             MoveWindow(hwnd, r.L, r.T, r.R - r.L, r.B - r.T)
         }
     }
+    SuppressMoveHighlight := wasSuppressed
     LogDebug(Format("ReapplySubtree: mon={}, node={}, leaves={} windows reapplied", mon, nodeId, leaves.Length))
 }
 

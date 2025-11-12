@@ -33,7 +33,7 @@ WindowPills_Clear() {
     }
     WindowPills.pills := []
     WindowPills.shown := false
-    try WindowPillsReserve := Map()
+    ; Keep WindowPillsReserve to avoid unnecessary window reapply flicker
     try WindowPills.guiToHwnd := Map()
 }
 
@@ -91,9 +91,11 @@ WP_BuildStateSignature() {
         ids := []
         for hwnd in arr
             ids.Push("" hwnd)
+        ; ignore order in signature to avoid rebuild flicker on activation reordering
+        try ids.Sort()
         sig.Push(key ":" StrJoin(ids, ","))
     }
-    sig.Push("F:" focused)
+    ; Focus intentionally excluded from signature to avoid rebuild flicker on activation
     return StrJoin(sig, "|")
 }
 
@@ -118,7 +120,7 @@ WP_CreatePill(x, y, text, isActive, targetHwnd := 0) {
     try g.SetFont(Format("s{} {}", WindowPillsFontSize, tColor), WindowPillsFont)
     ctrl := g.AddText("xm ym +0x0100 BackgroundTrans", text) ; +SS_NOTIFY for click
 
-    ; Initial show to allow proper measurement
+    ; Initial show off-screen to allow proper measurement
     g.Show("NA Hide")
     ctrl.GetPos(, , &tw, &th)
     w := Max(1, tw + 2 * WindowPillsPaddingX)
@@ -134,15 +136,17 @@ WP_CreatePill(x, y, text, isActive, targetHwnd := 0) {
     ctrl.Move(WindowPillsPaddingX, WindowPillsPaddingY)
 
     g.Move(Round(x), Round(y), w, h)
-    g.Show("NA")
+    ; visible state will be controlled by caller (shown after final placement)
     ; Register click mapping
     try {
         global WindowPills
         if (targetHwnd)
             WindowPills.guiToHwnd[g.Hwnd] := targetHwnd
-        ctrl.OnEvent("Click", (*) => WP_OnPillClick(targetHwnd))
+        if (IsObject(ctrl))
+            ctrl.OnEvent("Click", (*) => WP_OnPillClick(targetHwnd))
     }
-    return g
+    ; return as object to allow later updates
+    return { gui:g, ctrl:ctrl }
 }
 
 ; --- Layout/update ---------------------------------------------------------
@@ -164,12 +168,18 @@ WindowPills_Update() {
         WindowPillsReserve := Map()
 
     sig := WP_BuildStateSignature()
-    if (sig = WindowPills.lastSig)
-        return  ; nothing changed
+    if (sig = WindowPills.lastSig) {
+        ; Update only active state styling without rebuild to avoid flicker
+        WP_RefreshActiveStyles()
+        return
+    }
     WindowPills.lastSig := sig
 
-    ; Rebuild all pills for simplicity/stability
-    WindowPills_Clear()
+    ; Double-buffered rebuild to avoid visible gaps
+    global WindowPills
+    oldPills := WindowPills.pills
+    WindowPills.pills := []
+    WindowPills.guiToHwnd := Map()
 
     ; Iterate all leaves with windows
     for key, arr in LeafWindows {
@@ -212,7 +222,7 @@ WindowPills_Update() {
         maxX := r.R - WindowPillsMarginX  ; right bound for wrapping
 
         ; First pass: create and measure all pills
-        items := []  ; each: { gui, w, h }
+        items := []  ; each: { gui, ctrl, w, h, hwnd }
         for hwnd in arr {
             try {
                 title := WinGetTitle("ahk_id " hwnd)
@@ -224,9 +234,15 @@ WindowPills_Update() {
                 title := "(untitled)"
             txt := WP_TruncateTitle(title, WindowPillsMaxTitle)
             isActive := (hwnd = activeHwnd)
-            tmp := WP_CreatePill(-10000, -10000, txt, isActive, hwnd)
-            tmp.GetPos(, , &pw, &ph)
-            items.Push({ gui:tmp, w:pw, h:ph })
+            obj := WP_CreatePill(-10000, -10000, txt, isActive, hwnd)
+            ; measure
+            try obj.ctrl.GetPos(, , &tw, &th)
+            catch {
+                tw := 40, th := 18
+            }
+            pw := Max(1, tw + 2 * WindowPillsPaddingX)
+            ph := Max(1, th + 2 * WindowPillsPaddingY)
+            items.Push({ gui:obj.gui, ctrl:obj.ctrl, w:pw, h:ph, hwnd:hwnd })
         }
 
         ; Second pass: compute required reserve height with wrapping
@@ -268,24 +284,29 @@ WindowPills_Update() {
         for it in items {
             pw := it.w, ph := it.h
             if (curW = 0) {
-                it.gui.Move(Round(x), Round(y))
+                it.gui.Move(Round(x), Round(y), pw, ph)
                 curW := pw
                 lineH := Max(lineH, ph)
             } else if ((r.L + WindowPillsMarginX + curW + WindowPillsGap + pw) <= maxX) {
-                it.gui.Move(Round(r.L + WindowPillsMarginX + curW + WindowPillsGap), Round(y))
+                it.gui.Move(Round(r.L + WindowPillsMarginX + curW + WindowPillsGap), Round(y), pw, ph)
                 curW := curW + WindowPillsGap + pw
                 lineH := Max(lineH, ph)
             } else {
                 y += lineH + WindowPillsGap
                 curW := pw
                 lineH := ph
-                it.gui.Move(Round(r.L + WindowPillsMarginX), Round(y))
+                it.gui.Move(Round(r.L + WindowPillsMarginX), Round(y), pw, ph)
             }
+            try it.gui.Show("NA")
             WindowPills.pills.Push(it.gui)
         }
     }
 
     WindowPills.shown := (WindowPills.pills.Length > 0)
+    ; Destroy old after new are shown (double buffering)
+    for g in oldPills {
+        try g.Destroy()
+    }
 }
 
 WindowPills_UpdateTick(*) {
@@ -309,6 +330,61 @@ WP_OnPillClick(targetHwnd) {
                 SelectLeaf(info.mon, info.leaf, "manual")
             }
             WinActivate "ahk_id " targetHwnd
+        }
+    }
+}
+
+WP_RefreshActiveStyles() {
+    try {
+        global WindowPills, WinToLeaf
+        if (!IsObject(WindowPills) || !WindowPills.pills.Length)
+            return
+        ; Build active per leaf
+        activeMap := Map() ; key mon:leaf -> hwnd
+        try sysActive := WinGetID("A")
+        for hwnd, info in WinToLeaf {
+            key := info.mon ":" info.leaf
+            if (!activeMap.Has(key))
+                activeMap[key] := LeafGetTopWindow(info.mon, info.leaf)
+        }
+        if (sysActive && WinToLeaf.Has(sysActive)) {
+            st := WinToLeaf[sysActive]
+            activeMap[st.mon ":" st.leaf] := sysActive
+        }
+        ; Update each pill's appearance
+        for g in WindowPills.pills {
+            guiHwnd := g.Hwnd
+            if (!WindowPills.guiToHwnd.Has(guiHwnd))
+                continue
+            target := WindowPills.guiToHwnd[guiHwnd]
+            if (!WinToLeaf.Has(target))
+                continue
+            info := WinToLeaf[target]
+            key := info.mon ":" info.leaf
+            isActive := (activeMap.Has(key) && activeMap[key] = target)
+            WP_SetPillAppearance(g, isActive)
+        }
+    }
+}
+
+WP_SetPillAppearance(g, isActive) {
+    global WindowPillColor, WindowPillColorActive
+    global WindowPillsTextColor, WindowPillsActiveTextColor, WindowPillsFont, WindowPillsFontSize
+    try {
+        g.BackColor := (isActive ? WindowPillColorActive : WindowPillColor)
+        ; Update text color via stored control mapping (if available)
+        try {
+            ctrl := 0
+            ; We stored control object when creating; recover via enumeration
+            ; Best effort: find a Text control and set font color
+            for c in g {
+                ctrl := c
+                break
+            }
+            if (ctrl) {
+                col := isActive ? WindowPillsActiveTextColor : WindowPillsTextColor
+                ctrl.SetFont(Format("s{} {}", WindowPillsFontSize, col), WindowPillsFont)
+            }
         }
     }
 }
