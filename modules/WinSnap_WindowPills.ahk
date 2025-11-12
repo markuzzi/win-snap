@@ -294,3 +294,33 @@ WindowPills_UpdateTick(*) {
 
 ; Start periodic update
 SetTimer(WindowPills_UpdateTick, 300)
+
+; --- Click handling ---------------------------------------------------------
+
+WP_OnPillClick(targetHwnd) {
+    if (!targetHwnd)
+        return
+    try {
+        if (DllCall("IsWindow", "ptr", targetHwnd) && WinExist("ahk_id " targetHwnd)) {
+            ; Bring matching leaf into selection, then activate
+            global WinToLeaf
+            if (WinToLeaf.Has(targetHwnd)) {
+                info := WinToLeaf[targetHwnd]
+                SelectLeaf(info.mon, info.leaf, "manual")
+            }
+            WinActivate "ahk_id " targetHwnd
+        }
+    }
+}
+
+WP_OnMouse(wParam, lParam, msg, hwnd) {
+    try {
+        global WindowPills
+        if (!IsObject(WindowPills) || !WindowPills.HasOwnProp("guiToHwnd"))
+            return
+        if (WindowPills.guiToHwnd.Has(hwnd)) {
+            target := WindowPills.guiToHwnd[hwnd]
+            WP_OnPillClick(target)
+        }
+    }
+}
