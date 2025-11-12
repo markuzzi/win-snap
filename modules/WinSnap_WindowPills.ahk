@@ -107,6 +107,7 @@ WP_CreatePill(x, y, text, isActive, targetHwnd := 0) {
     global WindowPillsFont, WindowPillsFontSize
     global WindowPillsTextColor, WindowPillsActiveTextColor
     global WindowPillsPaddingX, WindowPillsPaddingY
+    global WindowPillsShowIcons, WindowPillsIconSize
 
     color := isActive ? WindowPillColorActive : WindowPillColor
     tColor := isActive ? WindowPillsActiveTextColor : WindowPillsTextColor
@@ -118,22 +119,40 @@ WP_CreatePill(x, y, text, isActive, targetHwnd := 0) {
     g.BackColor := color
     try WinSetTransparent(WindowPillsOpacity, g)
     try g.SetFont(Format("s{} {}", WindowPillsFontSize, tColor), WindowPillsFont)
-    ctrl := g.AddText("xm ym +0x0100 BackgroundTrans", text) ; +SS_NOTIFY for click
+    pic := 0
+    iconOk := false
+    if (IsSet(WindowPillsShowIcons) && WindowPillsShowIcons && targetHwnd) {
+        try {
+            path := WinGetProcessPath("ahk_id " targetHwnd)
+            if (path && FileExist(path)) {
+                pic := g.AddPicture(Format("xm ym w{} h{} Icon1 BackgroundTrans", WindowPillsIconSize, WindowPillsIconSize), path)
+                iconOk := true
+            }
+        }
+    }
+    ctrl := g.AddText("x+0 ym +0x0100 BackgroundTrans", text) ; +SS_NOTIFY for click
 
     ; Initial show off-screen to allow proper measurement
     g.Show("NA Hide")
     ctrl.GetPos(, , &tw, &th)
-    w := Max(1, tw + 2 * WindowPillsPaddingX)
-    h := Max(1, th + 2 * WindowPillsPaddingY)
+    contentW := tw + (iconOk ? (WindowPillsIconSize + WindowPillsIconGap) : 0)
+    contentH := Max(th, iconOk ? WindowPillsIconSize : th)
+    w := Max(1, contentW + 2 * WindowPillsPaddingX)
+    h := Max(1, contentH + 2 * WindowPillsPaddingY)
 
     ; Rounded region
-    radius := WindowPillsRadius
-    hRgn := DllCall("CreateRoundRectRgn", "Int", 0, "Int", 0, "Int", w, "Int", h, "Int", radius, "Int", radius, "Ptr")
-    if (hRgn)
-        DllCall("SetWindowRgn", "Ptr", g.Hwnd, "Ptr", hRgn, "Int", true)
+    WP_SetPillRegion(g, w, h)
 
     ; Center text within pill by adding padding offset
-    ctrl.Move(WindowPillsPaddingX, WindowPillsPaddingY)
+    ; Layout content: icon (if any) + gap + text, vertically centered
+    tx := WindowPillsPaddingX + (iconOk ? (WindowPillsIconSize + WindowPillsIconGap) : 0)
+    ty := WindowPillsPaddingY + Floor((h - 2*WindowPillsPaddingY - th) / 2)
+    if (iconOk) {
+        ix := WindowPillsPaddingX
+        iy := WindowPillsPaddingY + Floor((h - 2*WindowPillsPaddingY - WindowPillsIconSize) / 2)
+        try pic.Move(ix, iy, WindowPillsIconSize, WindowPillsIconSize)
+    }
+    ctrl.Move(tx, ty)
 
     g.Move(Round(x), Round(y), w, h)
     ; visible state will be controlled by caller (shown after final placement)
@@ -144,9 +163,11 @@ WP_CreatePill(x, y, text, isActive, targetHwnd := 0) {
             WindowPills.guiToHwnd[g.Hwnd] := targetHwnd
         if (IsObject(ctrl))
             ctrl.OnEvent("Click", (*) => WP_OnPillClick(targetHwnd))
+        if (IsObject(pic))
+            pic.OnEvent("Click", (*) => WP_OnPillClick(targetHwnd))
     }
     ; return as object to allow later updates
-    return { gui:g, ctrl:ctrl }
+    return { gui:g, ctrl:ctrl, pic:pic }
 }
 
 ; --- Layout/update ---------------------------------------------------------
@@ -222,7 +243,7 @@ WindowPills_Update() {
         maxX := r.R - WindowPillsMarginX  ; right bound for wrapping
 
         ; First pass: create and measure all pills
-        items := []  ; each: { gui, ctrl, w, h, hwnd }
+        items := []  ; each: { gui, ctrl, pic, w, h, hwnd }
         for hwnd in arr {
             try {
                 title := WinGetTitle("ahk_id " hwnd)
@@ -240,9 +261,12 @@ WindowPills_Update() {
             catch {
                 tw := 40, th := 18
             }
-            pw := Max(1, tw + 2 * WindowPillsPaddingX)
-            ph := Max(1, th + 2 * WindowPillsPaddingY)
-            items.Push({ gui:obj.gui, ctrl:obj.ctrl, w:pw, h:ph, hwnd:hwnd })
+            hasIcon := (IsSet(WindowPillsShowIcons) && WindowPillsShowIcons && obj.HasOwnProp("pic") && obj.pic)
+            contentW := tw + (hasIcon ? (WindowPillsIconSize + WindowPillsIconGap) : 0)
+            contentH := Max(th, hasIcon ? WindowPillsIconSize : th)
+            pw := Max(1, contentW + 2 * WindowPillsPaddingX)
+            ph := Max(1, contentH + 2 * WindowPillsPaddingY)
+            items.Push({ gui:obj.gui, ctrl:obj.ctrl, pic:obj.pic, w:pw, h:ph, hwnd:hwnd })
         }
 
         ; Second pass: compute required reserve height with wrapping
@@ -285,10 +309,14 @@ WindowPills_Update() {
             pw := it.w, ph := it.h
             if (curW = 0) {
                 it.gui.Move(Round(x), Round(y), pw, ph)
+                WP_SetPillRegion(it.gui, pw, ph)
+                WP_LayoutPillContent(it.gui, it.ctrl, it.pic, pw, ph)
                 curW := pw
                 lineH := Max(lineH, ph)
             } else if ((r.L + WindowPillsMarginX + curW + WindowPillsGap + pw) <= maxX) {
                 it.gui.Move(Round(r.L + WindowPillsMarginX + curW + WindowPillsGap), Round(y), pw, ph)
+                WP_SetPillRegion(it.gui, pw, ph)
+                WP_LayoutPillContent(it.gui, it.ctrl, it.pic, pw, ph)
                 curW := curW + WindowPillsGap + pw
                 lineH := Max(lineH, ph)
             } else {
@@ -296,6 +324,8 @@ WindowPills_Update() {
                 curW := pw
                 lineH := ph
                 it.gui.Move(Round(r.L + WindowPillsMarginX), Round(y), pw, ph)
+                WP_SetPillRegion(it.gui, pw, ph)
+                WP_LayoutPillContent(it.gui, it.ctrl, it.pic, pw, ph)
             }
             try it.gui.Show("NA")
             WindowPills.pills.Push(it.gui)
@@ -317,6 +347,32 @@ WindowPills_UpdateTick(*) {
 SetTimer(WindowPills_UpdateTick, 300)
 
 ; --- Click handling ---------------------------------------------------------
+
+WP_SetPillRegion(gui, w, h) {
+    try {
+        global WindowPillsRadius
+        radius := WindowPillsRadius
+        hRgn := DllCall("gdi32\\CreateRoundRectRgn", "Int", 0, "Int", 0, "Int", w, "Int", h, "Int", radius, "Int", radius, "Ptr")
+        if (hRgn)
+            DllCall("user32\\SetWindowRgn", "Ptr", gui.Hwnd, "Ptr", hRgn, "Int", true)
+    }
+}
+
+WP_LayoutPillContent(gui, ctrlText, ctrlPic, w, h) {
+    try {
+        global WindowPillsPaddingX, WindowPillsPaddingY, WindowPillsIconGap, WindowPillsIconSize
+        ctrlText.GetPos(, , &tw, &th)
+        tx := WindowPillsPaddingX
+        if (IsObject(ctrlPic)) {
+            ix := WindowPillsPaddingX
+            iy := WindowPillsPaddingY + Floor((h - 2*WindowPillsPaddingY - WindowPillsIconSize) / 2)
+            ctrlPic.Move(ix, iy, WindowPillsIconSize, WindowPillsIconSize)
+            tx += WindowPillsIconSize + WindowPillsIconGap
+        }
+        ty := WindowPillsPaddingY + Floor((h - 2*WindowPillsPaddingY - th) / 2)
+        ctrlText.Move(tx, ty)
+    }
+}
 
 WP_OnPillClick(targetHwnd) {
     if (!targetHwnd)
@@ -375,11 +431,18 @@ WP_SetPillAppearance(g, isActive) {
         ; Update text color via stored control mapping (if available)
         try {
             ctrl := 0
-            ; We stored control object when creating; recover via enumeration
-            ; Best effort: find a Text control and set font color
+            ; Find a Text control specifically
             for c in g {
-                ctrl := c
-                break
+                try {
+                    t := c.Type
+                }
+                catch {
+                    t := ""
+                }
+                if (t = "Text") {
+                    ctrl := c
+                    break
+                }
             }
             if (ctrl) {
                 col := isActive ? WindowPillsActiveTextColor : WindowPillsTextColor

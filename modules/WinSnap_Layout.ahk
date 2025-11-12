@@ -317,6 +317,32 @@ IsDescendant(mon, needle, rootId) {
     return false
 }
 
+; Findet den naechsten Vorfahren (Split-Knoten mit Achse axis), dessen andere
+; Seite den zweiten Leaf enthaelt. Trennt also exakt die Grenze zwischen leafA
+; und leafB entlang der Achse.
+Layout_FindAxisSplitBetweenLeaves(mon, leafA, leafB, axis) {
+    global Layouts
+    Layout_Ensure(mon)
+    nodes := Layouts[mon].nodes
+    if (!nodes.Has(leafA) || !nodes.Has(leafB))
+        return 0
+    cur := leafA
+    while (true) {
+        n := nodes[cur]
+        if (n.parent = 0)
+            break
+        pid := n.parent
+        p := nodes[pid]
+        if ((axis = "v" && p.split = "v") || (axis = "h" && p.split = "h")) {
+            sibling := (p.a = cur) ? p.b : p.a
+            if (IsDescendant(mon, leafB, sibling))
+                return pid
+        }
+        cur := pid
+    }
+    return 0
+}
+
 ; Wendet die aktuellen Rechtecke auf alle Fenster des Teilbaums erneut an.
 ReapplySubtree(mon, nodeId) {
     global WinToLeaf, Layouts, SuppressMoveHighlight

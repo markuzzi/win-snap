@@ -228,42 +228,114 @@ AdjustBoundaryForActive(whichArrow) {
     mon := ctx.mon
     leaf := ctx.leaf
 
-    ; passenden Elternknoten (gleiche Achse) finden
-    nodeId := leaf
+    ; Achse ermitteln und bevorzugte Nachbar-Richtung bestimmen
     axis := (whichArrow="Left" || whichArrow="Right") ? "v" : "h"
-    parent := 0
-    while true {
-        n := Layouts[mon].nodes[nodeId]
-        if (n.parent = 0)
-            break
-        p := Layouts[mon].nodes[n.parent]
-        if ((axis="v" && p.split="v") || (axis="h" && p.split="h")) {
-            parent := n.parent
-            break
-        }
-        nodeId := n.parent
+    ; Spezialwunsch: bei Links/Rechts immer die rechte Grenze der aktiven Area bewegen.
+    if (axis = "v") {
+        prefer := "right"
+        fallback := "left"
+    } else {
+        prefer := (whichArrow = "Down") ? "down" : "up"
+        fallback := (prefer = "down") ? "up" : "down"
     }
-    if (parent = 0)
+
+    ; Bevorzugten Nachbarn entlang der Achse suchen (sonst Fallback)
+    neighbor := FindNeighborLeaf(mon, leaf, prefer)
+    if (!neighbor)
+        neighbor := FindNeighborLeaf(mon, leaf, fallback)
+
+    parent := 0
+    if (neighbor) {
+        ; Exakte Trenn-Grenze zwischen leaf und (rechten) Nachbarn finden
+        try parent := Layout_FindAxisSplitBetweenLeaves(mon, leaf, neighbor, axis)
+    }
+
+    if (parent = 0) {
+        ; Fallback: wie bisher naechsten Eltern mit gleicher Achse nehmen
+        nodeId := leaf
+        while true {
+            n := Layouts[mon].nodes[nodeId]
+            if (n.parent = 0)
+                break
+            p2 := Layouts[mon].nodes[n.parent]
+            if ((axis="v" && p2.split="v") || (axis="h" && p2.split="h")) {
+                parent := n.parent
+                break
+            }
+            nodeId := n.parent
+        }
+        if (parent = 0)
+            return
+    }
+
+    if (axis = "v" && neighbor) {
+        ; Bewege IMMER die rechte Grenze der aktiven Area. Dazu muss ggf. die linke
+        ; interne Grenze kompensiert werden, damit die linke Nachbar-Area unverändert bleibt.
+        ; Finde zusätzlich den linken Vertikal-Split der aktiven Area (erstes 'v' mit leaf auf Seite B).
+        leftSplit := 0
+        nodeId := leaf
+        while true {
+            n := Layouts[mon].nodes[nodeId]
+            if (n.parent = 0)
+                break
+            pid := n.parent
+            pscan := Layouts[mon].nodes[pid]
+            if (pscan.split = "v") {
+                if (!IsDescendant(mon, leaf, pscan.a)) { ; leaf liegt auf rechter Seite -> linke Grenze
+                    leftSplit := pid
+                    break
+                }
+            }
+            nodeId := pid
+        }
+
+        rightSplit := parent  ; Grenze zur rechten Nachbar-Area
+        ; Prüfen, ob parent die Grenze zur RECHTEN Seite ist (leaf links, neighbor rechts)
+        sideCheck := Layouts[mon].nodes[rightSplit]
+        if (!(IsDescendant(mon, leaf, sideCheck.a) && (!IsDescendant(mon, neighbor, sideCheck.a)))) {
+            ; neighbor liegt nicht rechts -> kein Spezialpfad
+        } else {
+        pR := Layouts[mon].nodes[rightSplit]
+        oldR := pR.frac
+        d := (whichArrow = "Right") ? +SplitStep : -SplitStep
+        targetR := ClampFrac(oldR + d)
+        eff := targetR - oldR
+        if (eff = 0)
+        {
+            return
+        }
+        pR.frac := targetR
+        Layouts[mon].nodes[rightSplit] := pR
+
+        if (leftSplit) {
+            pL := Layouts[mon].nodes[leftSplit]
+            oldL := pL.frac
+            if (targetR > 0) {
+                newL := oldL * oldR / targetR
+                pL.frac := ClampFrac(newL)
+                Layouts[mon].nodes[leftSplit] := pL
+            }
+            ReapplySubtree(mon, leftSplit)
+        }
+        ReapplySubtree(mon, rightSplit)
+        Layout_SaveAll()
         return
+        }
+    }
 
+    ; Standardpfad (h-Achse oder kein rechter Nachbar): altes Verhalten
     p := Layouts[mon].nodes[parent]
-    leftOrTop := IsDescendant(mon, leaf, p.a)  ; liegt Leaf auf linker/oberer Seite?
-
+    leafOnA := IsDescendant(mon, leaf, p.a)
     step := SplitStep
     if (axis = "v") {
-        if (leftOrTop)
-            p.frac += (whichArrow="Right") ? +step : -step
-        else
-            p.frac += (whichArrow="Right") ? -step : +step
+        s := (whichArrow = "Right") ? +step : -step
+        p.frac += leafOnA ? s : -s
     } else {
-        if (leftOrTop)
-            p.frac += (whichArrow="Down") ? +step : -step
-        else
-            p.frac += (whichArrow="Down") ? -step : +step
+        s := (whichArrow = "Down") ? +step : -step
+        p.frac += leafOnA ? s : -s
     }
     p.frac := ClampFrac(p.frac)
     Layouts[mon].nodes[parent] := p
-
     ReapplySubtree(mon, parent)
     Layout_SaveAll()
 }
