@@ -1,6 +1,7 @@
 ; =========================
 ; Leaf Selection & Navigation
 ; =========================
+; Prueft, ob die Leaf-Area Fenster enthaelt.
 LeafHasWindows(mon, leafId) {
     global LeafWindows
     key := LeafKey(mon, leafId)
@@ -12,6 +13,7 @@ LeafHasWindows(mon, leafId) {
     return LeafWindows[key].Length > 0
 }
 
+; Setzt die aktuelle Leaf-Auswahl (manuell/auto) und aktualisiert Highlight.
 SelectLeaf(mon, leafId, source := "manual") {
     global CurrentLeafSelection, CurrentHighlight
     if (!mon) {
@@ -41,6 +43,7 @@ SelectLeaf(mon, leafId, source := "manual") {
     ApplyLeafHighlight(mon, leafId)
 }
 
+; Liefert die aktuell ausgewaehlte Leaf-Id fuer den Monitor.
 GetSelectedLeaf(mon) {
     global CurrentLeafSelection
     if (CurrentLeafSelection.Has(mon))
@@ -48,6 +51,7 @@ GetSelectedLeaf(mon) {
     return 0
 }
 
+; Merkt Aktivierung eines Fensters und setzt es in der Leaf-Liste nach oben.
 LeafRecordActivation(hwnd) {
     global LeafWindows, WinToLeaf
     if (!WinToLeaf.Has(hwnd))
@@ -80,6 +84,7 @@ LeafRecordActivation(hwnd) {
     SelectLeaf(info.mon, info.leaf, "auto")
 }
 
+; Ermittelt Navigationskontext (Monitor, Leaf, hwnd) anhand aktivem Fenster.
 GetLeafNavigationContext() {
     global CurrentLeafSelection, WinToLeaf, Layouts
     win := GetActiveWindow()
@@ -109,6 +114,7 @@ GetLeafNavigationContext() {
     return { mon:mon, leaf:leaf, hwnd:0 }
 }
 
+; Liefert den manuellen Navigationskontext, falls gesetzt.
 GetManualNavigationContext() {
     global ManualNav, Layouts
     if (ManualNav.mon && ManualNav.leaf) {
@@ -120,6 +126,7 @@ GetManualNavigationContext() {
     return { mon:0, leaf:0 }
 }
 
+; Ueberschreibt ctx mit manuell gesetzter Leaf-Auswahl (falls vorhanden).
 ApplyManualNavigation(ctx) {
     nav := GetManualNavigationContext()
     if (nav.mon) {
@@ -129,11 +136,13 @@ ApplyManualNavigation(ctx) {
     return ctx
 }
 
+; Setzt die manuelle Navigation auf (mon, leaf).
 ManualNav_Set(mon, leaf) {
     global ManualNav
     ManualNav := { mon:mon, leaf:leaf }
 }
 
+; Loescht die manuelle Navigation (optional nur fuer einen Monitor).
 ManualNav_Clear(mon := 0) {
     global ManualNav
     if (!mon || ManualNav.mon = mon)

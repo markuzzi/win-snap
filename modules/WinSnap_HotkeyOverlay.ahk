@@ -4,6 +4,7 @@
 
 HotkeyOverlay := { gui:"", shown:false, toggleMode:false }
 
+; Initialisiert die Overlay-GUI zur Anzeige der Shortcuts.
 HotkeyOverlay_Init() {
     global HotkeyOverlay
     if (HotkeyOverlay.gui)
@@ -26,6 +27,7 @@ HotkeyOverlay_Init() {
     HotkeyOverlay.text := txt
 }
 
+; Baut den anzuzeigenden Shortcut-Text fuer das Overlay zusammen.
 HotkeyOverlay_BuildText() {
     ; Liste der Shortcuts und Bedeutung (kurz)
     lines := []
@@ -53,6 +55,7 @@ HotkeyOverlay_BuildText() {
     return StrJoin(lines, "`r`n")
 }
 
+; Aktualisiert den Text-Inhalt des Overlays.
 HotkeyOverlay_UpdateText() {
     global HotkeyOverlay
     if (HotkeyOverlay.gui) {
@@ -60,6 +63,7 @@ HotkeyOverlay_UpdateText() {
     }
 }
 
+; Zeigt das Overlay zentriert auf dem aktiven Monitor an.
 HotkeyOverlay_Show() {
     global HotkeyOverlay
     HotkeyOverlay_Init()
@@ -89,6 +93,7 @@ HotkeyOverlay_Show() {
     }
 }
 
+; Blendet das Overlay aus (oder ignoriert bei Toggle-Modus, falls nicht erzwungen).
 HotkeyOverlay_Hide(force := false) {
     global HotkeyOverlay
     if (!HotkeyOverlay.gui)
@@ -100,6 +105,7 @@ HotkeyOverlay_Hide(force := false) {
     LogInfo("HotkeyOverlay_Hide")
 }
 
+; Schaltet die Anzeige des Overlays an/aus.
 HotkeyOverlay_Toggle() {
     global HotkeyOverlay
     if (HotkeyOverlay.shown) {
@@ -112,6 +118,7 @@ HotkeyOverlay_Toggle() {
 }
 
 ; Round overlay corners via DWM (Win11) or window region (fallback)
+; Rundet die Fensterecken per DWM-Attribut oder Region (Fallback).
 HotkeyOverlay_ApplyRounded(gui) {
     if (!gui)
         return

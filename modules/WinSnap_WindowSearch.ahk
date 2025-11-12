@@ -1,6 +1,7 @@
 ; =========================
 ; Fenster-Suchdialog (Alt+Space)
 ; =========================
+; Erstellt und initialisiert die GUI fuer die Fenster-Suche.
 InitWindowSearchGui() {
     global WindowSearch
     if (WindowSearch.gui)
@@ -20,6 +21,7 @@ InitWindowSearchGui() {
     WindowSearch.list := list
 }
 
+; Baut die Kandidatenliste aller relevanten Fenster (Titel/Prozess) auf.
 BuildWindowCandidateList() {
     global WindowSearch
     arr := []
@@ -51,6 +53,7 @@ BuildWindowCandidateList() {
     return arr
 }
 
+; Oeffnet den Suchdialog fuer den aktuellen Leaf-Kontext.
 WindowSearch_Open() {
     global WindowSearch
     if (WindowSearch.active) {
@@ -85,6 +88,7 @@ WindowSearch_Open() {
     LogInfo(Format("WindowSearch_Open: mon={}, leaf={}, items={} ", ctx.mon, ctx.leaf, WindowSearch.items.Length))
 }
 
+; Schliesst den Suchdialog und setzt den Status zurueck.
 WindowSearch_Close() {
     global WindowSearch
     if (!WindowSearch.gui)
@@ -96,10 +100,12 @@ WindowSearch_Close() {
     LogInfo("WindowSearch_Close")
 }
 
+; Event-Handler: aktualisiert das Ergebnis bei Texteingabe.
 WindowSearch_OnInput(ctrl, *) {
     WindowSearch_Update(ctrl.Value)
 }
 
+; Verschiebt die Auswahl in der Trefferliste um delta.
 WindowSearch_MoveSelection(delta) {
     global WindowSearch
     if (!WindowSearch.filtered.Length)
@@ -117,6 +123,7 @@ WindowSearch_MoveSelection(delta) {
     LogDebug(Format("WindowSearch_MoveSelection: newIndex={} of {}", current, WindowSearch.filtered.Length))
 }
 
+; Filtert und sortiert die Kandidatenliste nach dem Suchbegriff.
 WindowSearch_Update(term := "") {
     global WindowSearch
     if (!WindowSearch.gui)
@@ -148,6 +155,7 @@ WindowSearch_Update(term := "") {
     LogDebug(Format("WindowSearch_Update: term='{}', results={}", termLower, filtered.Length))
 }
 
+; Bewertet die Uebereinstimmung (Substring/Fuzzy) zwischen Suchbegriff und Text.
 WindowSearch_Score(termLower, searchText) {
     if (termLower = "")
         return 0
@@ -167,10 +175,12 @@ WindowSearch_Score(termLower, searchText) {
     return score
 }
 
+; Event-Wrapper fuer Bestaetigung per Doppelklick/Enter.
 WindowSearch_OnConfirm(*) {
     WindowSearch_Confirm()
 }
 
+; Vergleichsfunktion nach Score (fuer Sortierung).
 WindowSearch_CompareScore(a, b, *) {
     if (a.score > b.score)
         return -1
@@ -179,6 +189,7 @@ WindowSearch_CompareScore(a, b, *) {
     return WindowSearch_CompareTitle(a, b, 0)
 }
 
+; Vergleichsfunktion nach Fenstertitel (alphabetisch, case-insensitive).
 WindowSearch_CompareTitle(a, b, *) {
     ta := WindowSearch_ItemTitle(a)
     tb := WindowSearch_ItemTitle(b)
@@ -190,6 +201,7 @@ WindowSearch_CompareTitle(a, b, *) {
     return 0
 }
 
+; Einfache, stabile Array-Sortierung mit optionalem Vergleichs-Callback.
 ArraySort(arr, compareFn := "") {
     if (!(arr is Array))
         throw Error("ArraySort() erwartet ein Array.")
@@ -219,12 +231,14 @@ ArraySort(arr, compareFn := "") {
 }
 
 
+; Extrahiert den Titelstring aus einem Item (Objekt oder String).
 WindowSearch_ItemTitle(item) {
     if (IsObject(item) && item.HasOwnProp("title"))
         return item.title
     return String(item)
 }
 
+; Bewegt/aktiviert das ausgewaehlte Fenster im aktuellen Leaf-Kontext.
 WindowSearch_Confirm() {
     global WindowSearch
     if (!WindowSearch.filtered.Length)

@@ -3,6 +3,7 @@
 ; =========================
 
 
+; Bewegt ein Fenster in die Leaf-Area, haengt es an und setzt Highlight.
 SnapToLeaf(hwnd, mon, leafId) {
     r := GetLeafRectPx(mon, leafId)
     DebugLog(Format("SnapToLeaf hwnd={}, mon={}, leaf={}, rect=({}, {}, {}, {})", hwnd, mon, leafId, r.L, r.T, r.R, r.B))
@@ -11,6 +12,7 @@ SnapToLeaf(hwnd, mon, leafId) {
     ApplyLeafHighlight(mon, leafId)
 }
 
+; Snappt ein Fenster anhand eines Kontextes {mon,leaf}.
 MoveWindowIntoLeaf(hwnd, ctx) {
     if (!ctx || !ctx.mon || !ctx.leaf)
         return
@@ -18,6 +20,7 @@ MoveWindowIntoLeaf(hwnd, ctx) {
     SnapToLeaf(hwnd, ctx.mon, ctx.leaf)
 }
 
+; Merkt die aktuelle Fensterposition zur spaeteren Wiederherstellung.
 EnsureHistory(hwnd) {
     global WinHistory
     if (WinHistory.Has(hwnd))
@@ -30,6 +33,7 @@ EnsureHistory(hwnd) {
     WinHistory[hwnd] := { x:x, y:y, w:w, h:h }
 }
 
+; Stellt die gemerkte Ursprungsposition wieder her und entfernt Zuordnung.
 UnSnapWindow(hwnd) {
     global WinHistory, LastDir
     if (WinHistory.Has(hwnd) && DllCall("IsWindow", "ptr", hwnd) && WinExist("ahk_id " hwnd)) {
@@ -44,6 +48,7 @@ UnSnapWindow(hwnd) {
 }
 
 ; >>> GridMove mit Auto-Split & "erstem Snap"
+; Verschiebt das aktive Fenster zur Nachbar-Leaf (Auto-Split/Monitorwechsel inkl.).
 GridMove(dir) {
     global WinToLeaf, LastDir, Layouts
     LogInfo(Format("GridMove: dir={}", dir))
@@ -110,6 +115,7 @@ GridMove(dir) {
 }
 
 ; Für "erstes Snap" (wenn noch nicht gesnappt): passende Leaf in Richtung wählen
+; Waehlt fuer ein noch ungesnapptes Fenster das Ziel-Leaf in Richtung dir.
 PickLeafForUnsapped(mon, dir, cx, cy) {
     Layout_Ensure(mon)
     rects := Layout_AllLeafRects(mon)
@@ -159,6 +165,7 @@ PickLeafForUnsapped(mon, dir, cx, cy) {
 ; =========================
 ; Splitten & Grenze justieren
 ; =========================
+; Teilt die aktuelle Leaf-Area in der angegebenen Orientierung ("v"/"h").
 SplitCurrentLeaf(orient) {
     global WinToLeaf, Layouts, LastDir
     ; orient = "v" (links/rechts) oder "h" (oben/unten)
@@ -212,6 +219,7 @@ SplitCurrentLeaf(orient) {
     }
 }
 
+; Justiert die Teilungsgrenze der passenden Split-Gruppe um SplitStep.
 AdjustBoundaryForActive(whichArrow) {
     global SplitStep, Layouts
     ctx := ApplyManualNavigation(GetLeafNavigationContext())
@@ -260,6 +268,7 @@ AdjustBoundaryForActive(whichArrow) {
     Layout_SaveAll()
 }
 
+; Wechselt die Auswahl zur benachbarten Leaf-Area (optional mit Aktivierung).
 SwitchSnapArea(dir) {
     global Layouts, ActivateOnAreaSwitch
     LogInfo(Format("SwitchSnapArea: dir={} (activateOnSwitch={})", dir, (IsSet(ActivateOnAreaSwitch) && ActivateOnAreaSwitch)))
@@ -303,6 +312,7 @@ SwitchSnapArea(dir) {
         FlashLeafOutline(nextMon, leaf)
 }
 
+; Findet den naechsten Monitor in Bewegungsrichtung.
 FindNeighborMonitor(mon, dir) {
     cur := GetMonitorWork(mon)
     curCX := (cur.left + cur.right) / 2
@@ -346,6 +356,7 @@ FindNeighborMonitor(mon, dir) {
     return best
 }
 
+; Wechselt das aktive Fenster innerhalb der aktuellen Leaf-Area.
 CycleWindowInLeaf(direction) {
     global WinToLeaf
     win := GetActiveWindow()
@@ -377,6 +388,7 @@ CycleWindowInLeaf(direction) {
     LogInfo(Format("CycleWindowInLeaf: direction={}, activated hwnd={}", direction, target))
 }
 
+; Entfernt die aktuelle Leaf-Area und promoted das Geschwister (Fenster werden umgezogen).
 DeleteCurrentSnapArea() {
     global LeafWindows
     LogInfo("DeleteCurrentSnapArea: invoked")
@@ -417,6 +429,7 @@ DeleteCurrentSnapArea() {
     LogInfo(Format("DeleteCurrentSnapArea: removed leaf {}, promoted {}, mon={}", ctx.leaf, siblingId, ctx.mon))
 }
 
+; Zeigt alle Snap-Areas auf allen Monitoren kurz als Overlay.
 ShowAllSnapAreasHotkey() {
     global OverlayColor, OverlayDuration
     count := MonitorGetCount()
@@ -438,6 +451,7 @@ ShowAllSnapAreasHotkey() {
 }
 
 
+; Sammelt passende Fenster (Mitte im Zielrechteck) in die aktive Leaf-Area ein.
 CollectWindowsInActiveLeaf() {
     global Layouts
     LogInfo("CollectWindowsInActiveLeaf: start")
@@ -475,6 +489,7 @@ CollectWindowsInActiveLeaf() {
     LogInfo(Format("CollectWindowsInActiveLeaf: collected {} windows into mon={}, leaf={}", collected, ctx.mon, ctx.leaf))
 }
 
+; Prueft, ob ein Fenster fuer Einsammeln/Snappen geeignet ist (sichtbar, kein Systemfenster).
 IsCollectibleSnapWindow(hwnd) {
     static scriptPid := DllCall("GetCurrentProcessId")
     if (!hwnd)
@@ -513,6 +528,7 @@ IsCollectibleSnapWindow(hwnd) {
     return true
 }
 
+; Prueft, ob die Fenstermitte innerhalb des Rechtecks liegt.
 WindowCenterInsideRect(hwnd, rect) {
     if (!hwnd)
         return false
@@ -528,6 +544,7 @@ WindowCenterInsideRect(hwnd, rect) {
     return (cx >= rect.L && cx <= rect.R && cy >= rect.T && cy <= rect.B)
 }
 
+; Speichert die letzte Navigationsrichtung fuer das Fenster.
 SetLastDirection(hwnd, dir) {
     global LastDir
     if (dir = "left" || dir = "right")
@@ -539,6 +556,7 @@ SetLastDirection(hwnd, dir) {
 }
 
 ; Expand current window to span its leaf and its neighbor in the given direction (simple version)
+; Erweitert das aktuelle Fenster ueber die Nachbar-Leaf in Richtung dir.
 ExpandWindowAcrossNeighbor(dir) {
     ExpandOrReduceWindow(dir)
 }
@@ -546,6 +564,7 @@ ExpandWindowAcrossNeighbor(dir) {
 ; Enhanced expansion with state and reduction support
 global ExpandedWindows := Map() ; hwnd -> { mon, baseLeaf, dir, neighbor, attached }
 
+; Liefert die Gegenrichtung zu dir.
 OppositeDir(dir) {
     if (dir = "left")
         return "right"
@@ -558,6 +577,7 @@ OppositeDir(dir) {
     return ""
 }
 
+; Expandiert oder reduziert das Fenster (Toggle) basierend auf dem Zustand.
 ExpandOrReduceWindow(dir) {
     global WinToLeaf, Layouts, ExpandedWindows
     win := GetActiveWindow()

@@ -1,11 +1,13 @@
 ; =========================
 ; Utilities
 ; =========================
+; Begrenzt einen Anteilswert auf den Bereich [MinFrac, MaxFrac].
 ClampFrac(val) {
     global MinFrac, MaxFrac
     return Max(MinFrac, Min(MaxFrac, val))
 }
 
+; Liefert das aktive Fenster inkl. Position/Groesse (oder 0 bei Fehler).
 GetActiveWindow() {
     try {
         hwnd := WinGetID("A")
@@ -22,6 +24,7 @@ GetActiveWindow() {
     return { hwnd:hwnd, x:x, y:y, w:w, h:h }
 }
 
+; Bestimmt Monitorindex und Arbeitsbereich des Fensters hwnd.
 GetMonitorIndexAndArea(hwnd) {
     try {
         WinGetPos &wx, &wy, &ww, &wh, "ahk_id " hwnd
@@ -40,6 +43,7 @@ GetMonitorIndexAndArea(hwnd) {
     return { index:1, left:L, top:T, right:R, bottom:B }
 }
 
+; Liefert den Workarea-Rechteck des angegebenen Monitors.
 GetMonitorWork(mon) {
     count := MonitorGetCount()
     if (count <= 0)
@@ -54,6 +58,7 @@ GetMonitorWork(mon) {
     return { left:L, top:T, right:R, bottom:B }
 }
 
+; Stellt sicher, dass ein Fenster vor dem Verschieben restaurierbar ist (z.B. aus minimiert).
 EnsureRestorable(hwnd) {
     mm := 0
     try {
@@ -80,6 +85,7 @@ EnsureRestorable(hwnd) {
 }
 
 ; --- Logging ---------------------------------------------------------------
+; Schreibt eine Logzeile bei aktivem Logging und passendem Level.
 LogWrite(levelNum, levelName, msg) {
     global LoggingEnabled, LoggingLevel, LoggingPath, FrameCompDebug, FrameCompLogPath
     enabled := IsSet(LoggingEnabled) ? LoggingEnabled : (IsSet(FrameCompDebug) ? FrameCompDebug : false)
@@ -95,31 +101,38 @@ LogWrite(levelNum, levelName, msg) {
     }
 }
 
+; Loggt eine Meldung auf Level ERROR.
 LogError(msg) {
     LogWrite(-1, "ERROR", msg)
 }
 
+; Loggt eine Meldung auf Level WARN.
 LogWarn(msg) {
     LogWrite(0, "WARN", msg)
 }
 
+; Loggt eine Meldung auf Level INFO.
 LogInfo(msg) {
     LogWrite(1, "INFO", msg)
 }
 
+; Loggt eine Meldung auf Level DEBUG.
 LogDebug(msg) {
     LogWrite(2, "DEBUG", msg)
 }
 
+; Loggt eine Meldung auf Level TRACE.
 LogTrace(msg) {
     LogWrite(3, "TRACE", msg)
 }
 
 ; Backward compat
+; Rueckwaertskompatibler Alias fuer LogDebug.
 DebugLog(msg) {
     LogDebug(msg)
 }
 
+; Gibt den Inhalt einer Variablen/Struktur als formatierten String zurueck.
 DumpVar(var, indent := 0) {
     out := ""
     pad := ""
@@ -162,6 +175,7 @@ DumpVar(var, indent := 0) {
 
 
 ; --- Small helpers ---------------------------------------------------------
+; Verbindet Array-Elemente zu einem String mit Separator sep.
 StrJoin(arr, sep := "") {
     if !(arr is Array)
         return ""
@@ -174,6 +188,7 @@ StrJoin(arr, sep := "") {
     return out
 }
 
+; Setzt den Tooltip des Tray-Icons (best-effort).
 TraySetToolTip(text) {
     try {
         A_IconTip := text
@@ -181,6 +196,7 @@ TraySetToolTip(text) {
 }
 
 ; Liefert die von DWM gemeldeten Extended Frame Bounds (sichtbare Fensteraussenkanten)
+; Liest die von DWM gemeldeten Extended Frame Bounds eines Fensters.
 GetExtendedFrameBounds(hwnd) {
     try {
         buf := Buffer(16, 0)
@@ -216,6 +232,7 @@ GetExtendedFrameBounds(hwnd) {
     }
 }
 
+; Verschiebt/Skaliert ein Fenster mit EFB-Kompensation und Sanity-Checks.
 MoveWindow(hwnd, x, y, w, h) {
     try {
         exists := DllCall("IsWindow", "ptr", hwnd) && WinExist("ahk_id " hwnd)
@@ -381,6 +398,7 @@ MoveWindow(hwnd, x, y, w, h) {
 }
 
 ; --- Hilfsfunktionen: Normierte Rechtecke → Pixelkoordinaten ---
+; Wandelt 0..1-Rect (monitorrelativ) in Pixelkoordinaten um.
 ToPixelRect(mon, r) {
     ; Erkennt 0–1-Rects und skaliert sie auf Monitorpixel
     m := GetMonitorWork(mon)
@@ -398,6 +416,7 @@ ToPixelRect(mon, r) {
     return r
 }
 
+; Liefert das Rechteck einer Leaf-Area in Pixelkoordinaten.
 GetLeafRectPx(mon, leafId) {
     return ToPixelRect(mon, GetLeafRect(mon, leafId))
 }

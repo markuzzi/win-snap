@@ -225,6 +225,7 @@ Esc:: {
     ExitApp()
 }
 
+; Schaltet Hotkeys und relevante Timer pausiert/aktiv (Toggle).
 TogglePause() {
     global ScriptPaused
     newState := !ScriptPaused
@@ -251,6 +252,7 @@ TogglePause() {
 ; =========================
 
 ; Helper to get current monitor index
+; Liefert den Monitorindex des aktuell aktiven Fensters (Fallback 1).
 GetCurrentMonitorIndex() {
     win := GetActiveWindow()
     if (win) {
@@ -314,6 +316,7 @@ GetCurrentMonitorIndex() {
 ; --------------------
 ; Tray Icon utilities
 ; --------------------
+; Initialisiert das Tray-Icon und setzt den Tooltip.
 InitTrayIcon() {
     ico := A_ScriptDir "\WinSnap.ico"
     try {
@@ -328,6 +331,7 @@ InitTrayIcon() {
     UpdateTrayTooltip()
 }
 
+; Aktualisiert den Tray-Tooltip basierend auf dem Pausenstatus.
 UpdateTrayTooltip() {
     global ScriptPaused
     tip := ScriptPaused ? "WinSnap — Pausiert" : "WinSnap — Aktiv"
@@ -335,6 +339,7 @@ UpdateTrayTooltip() {
 }
 
 ; Zeigt einen TrayTip für eine begrenzte Zeit und blendet ihn danach aus.
+; Zeigt einen TrayTip fuer eine begrenzte Zeit und blendet ihn danach aus.
 ShowTrayTip(msg, ms := 1500, icon := "") {
     try {
         if (icon != "")
@@ -348,6 +353,7 @@ ShowTrayTip(msg, ms := 1500, icon := "") {
     }
 }
 
+; Blendet den aktuell angezeigten TrayTip aus.
 ShowTrayTip_Hide() {
     try TrayTip()
 }

@@ -1,6 +1,7 @@
 ; =========================
 ; Highlight (roter Rahmen)
 ; =========================
+; Initialisiert die GUI-Struktur fuer den Highlight-Rahmen (click-through).
 HL_Init() {
     global HL
     if (HL.init)
@@ -12,6 +13,7 @@ HL_Init() {
     LogDebug("HL_Init: highlight GUI initialized")
 }
 
+; Zeigt einen abgerundeten Rahmen um das angegebene Rechteck an.
 ShowHighlightRect(rect) {
     global HL, BorderPx, HighlightEnabled
     if (!HighlightEnabled)
@@ -47,6 +49,7 @@ ShowHighlightRect(rect) {
     DllCall("DeleteObject", "Ptr", innerRgn)
 }
 
+; Blendet das Highlight aus und setzt den aktuellen Zustand zurueck.
 HideHighlight() {
     global HL, CurrentHighlight
     if (HL.init) {
@@ -57,6 +60,7 @@ HideHighlight() {
 }
 
 
+; Zeigt das Highlight fuer die angegebene Leaf-Area (oder entfernt es).
 ApplyLeafHighlight(mon, leafId) {
     global HighlightEnabled, CurrentHighlight, Layouts, CurrentLeafSelection
     if (!HighlightEnabled) {
@@ -80,6 +84,7 @@ ApplyLeafHighlight(mon, leafId) {
     LogTrace(Format("ApplyLeafHighlight: mon={}, leaf={}", mon, leafId))
 }
 
+; Aktualisiert das Highlight basierend auf aktivem Fenster/manueller Auswahl.
 UpdateActiveHighlight(*) {
     global WinToLeaf, WindowSearch, DragSnap
     try {

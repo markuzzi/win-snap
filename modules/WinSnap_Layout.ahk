@@ -1,6 +1,7 @@
 ; =========================
 ; Layout (Grid) – Baum pro Monitor
 ; =========================
+; Initialisiert die Layout-Struktur fuer den Monitor, falls noetig.
 Layout_Ensure(mon) {
     global Layouts
     needsReset := false
@@ -22,6 +23,7 @@ Layout_Ensure(mon) {
     LogInfo(Format("Layout_Ensure: initialized layout for monitor {}", mon))
 }
 
+; Liefert den Knoteneintrag (Map) fuer id auf dem Monitor.
 Layout_Node(mon, id) {
     global Layouts
     Layout_Ensure(mon)
@@ -31,6 +33,7 @@ Layout_Node(mon, id) {
     return nodes.Has(id) ? nodes[id] : 0
 }
 
+; Prueft, ob der Knoten ein Leaf (keine weitere Teilung) ist.
 Layout_IsLeaf(mon, id) {
     global Layouts
     Layout_Ensure(mon)
@@ -43,6 +46,7 @@ Layout_IsLeaf(mon, id) {
     return (n.split = "")
 }
 
+; Teilt ein Leaf in zwei Kinder (orient = "v" oder "h").
 Layout_SplitLeaf(mon, leafId, orient) {
     global Layouts
     Layout_Ensure(mon)
@@ -62,6 +66,7 @@ Layout_SplitLeaf(mon, leafId, orient) {
     Layout_SaveAll()
 }
 
+; Berechnet das Rechteck eines Knotens anhand des Split-Baums.
 Layout_NodeRect(mon, nodeId) {
     global Layouts
     Layout_Ensure(mon)
@@ -105,6 +110,7 @@ Layout_NodeRect(mon, nodeId) {
     return rect
 }
 
+; Wendet den globalen Abstand (SnapGap) auf ein Rechteck an.
 ApplySnapGap(rect) {
     global SnapGap
     gap := Max(0, SnapGap)
@@ -125,11 +131,13 @@ ApplySnapGap(rect) {
     return rect
 }
 
+; Liefert das Leaf-Rechteck inkl. angewendetem SnapGap.
 GetLeafRect(mon, leafId) {
     rect := Layout_NodeRect(mon, leafId)
     return ApplySnapGap(rect)
 }
 
+; Liefert eine Map aller Leaf-Rechtecke des Monitors.
 Layout_AllLeafRects(mon) {
     global Layouts
     Layout_Ensure(mon)
@@ -143,6 +151,7 @@ Layout_AllLeafRects(mon) {
     return out
 }
 
+; Findet das Leaf, das den Punkt (x,y) enthaelt.
 Layout_FindLeafAtPoint(mon, x, y) {
     global Layouts
     Layout_Ensure(mon)
@@ -182,6 +191,7 @@ Layout_FindLeafAtPoint(mon, x, y) {
     }
 }
 
+; Entfernt ein Leaf und promoted das Geschwister; gibt dessen Id zurueck.
 Layout_RemoveLeaf(mon, leafId) {
     global Layouts
     Layout_Ensure(mon)
@@ -220,6 +230,7 @@ Layout_RemoveLeaf(mon, leafId) {
     return siblingId
 }
 
+; Findet das benachbarte Leaf in der angegebenen Richtung.
 FindNeighborLeaf(mon, leafId, dir) {
     rects := Layout_AllLeafRects(mon)
     if (!rects.Has(leafId))
@@ -252,6 +263,7 @@ FindNeighborLeaf(mon, leafId, dir) {
     return bestId
 }
 
+; Sammelt alle Leaf-Ids unterhalb des Knotens id.
 Layout_LeavesUnder(mon, id) {
     global Layouts
     arr := []
@@ -269,6 +281,7 @@ Layout_LeavesUnder(mon, id) {
     return arr
 }
 
+; Prueft, ob needle ein Nachfahre von rootId ist.
 IsDescendant(mon, needle, rootId) {
     global Layouts
     stack := [rootId]
@@ -285,6 +298,7 @@ IsDescendant(mon, needle, rootId) {
     return false
 }
 
+; Wendet die aktuellen Rechtecke auf alle Fenster des Teilbaums erneut an.
 ReapplySubtree(mon, nodeId) {
     global WinToLeaf, Layouts
     leaves := Layout_LeavesUnder(mon, nodeId)
@@ -303,6 +317,7 @@ ReapplySubtree(mon, nodeId) {
 ; =========================
 ; Layout Persistence (multi-monitor-safe)
 ; =========================
+; Speichert alle Layouts als JSON-Datei (multi-monitor-safe).
 Layout_SaveAll() {
     global Layouts
     path := Layout_GetStoragePath()
@@ -319,6 +334,7 @@ Layout_SaveAll() {
     LogInfo(Format("Layout_SaveAll: saved to {}", path))
 }
 
+; Laedt alle Layouts aus der JSON-Datei oder initialisiert Defaults.
 Layout_LoadAll() {
     global Layouts
     path := Layout_GetStoragePath()
@@ -409,6 +425,7 @@ Layout_LoadAll() {
     LogInfo(Format("Layout_LoadAll: loaded layouts for {} monitors", Layouts.Count))
 }
 
+; Serialisiert die Layouts in eine Map-Struktur fuer JSON.
 Layout_SerializeAll() {
     global Layouts
     data := Map()
@@ -434,6 +451,7 @@ Layout_SerializeAll() {
     return data
 }
 
+; Konvertiert einen Wert in Integer mit Default bei Fehler.
 Layout_ToInt(value, default := 0) {
     try {
         return Integer(value)
@@ -443,12 +461,14 @@ Layout_ToInt(value, default := 0) {
     }
 }
 
+; Pfad zur Layout-JSON-Datei im Script-Verzeichnis.
 Layout_GetStoragePath() {
     return A_ScriptDir "\WinSnap_layouts.json"
 }
 
 
 ; Window Leaf Assignments speichern/laden
+; Speichert eine Zuordnung (exe+title) fuer ein Leaf des Monitors.
 SaveLeafAssignment(mon, leafId, hwnd) {
     global Layouts
     Layout_Ensure(mon)
@@ -478,6 +498,7 @@ SaveLeafAssignment(mon, leafId, hwnd) {
     LogInfo(Format("SaveLeafAssignment: mon={}, leaf={}, exe={}, title={} -> saved", mon, leafId, exe, title))
 }
 
+; Snappt bekannte (zugeordnete) Fenster an ihr Leaf, falls noetig.
 AutoSnap_AssignedWindows() {
     global Layouts
     for mon, layout in Layouts {
@@ -512,6 +533,7 @@ AutoSnap_AssignedWindows() {
     }
 }
 
+; Sucht ein Fensterhandle nach Prozessname und optional Titelteil.
 FindWindow(exe, title := "") {
     idList := WinGetList()
     for hwnd in idList {
@@ -525,6 +547,7 @@ FindWindow(exe, title := "") {
     return 0
 }
 
+; Ermittelt neu gestartete, zugeordnete Fenster und snappt sie ggf. ins Leaf.
 AutoSnap_NewlyStartedWindows() {
     global Layouts
     for mon, layout in Layouts {
@@ -547,6 +570,7 @@ AutoSnap_NewlyStartedWindows() {
     }
 }
 
+; Bewegt ein Fenster in das Ziel-Leaf und aktualisiert das Mapping.
 SnapWindowToLeaf(hwnd, mon, leafId) {
     rect := GetLeafRect(mon, leafId)
     MoveWindow(hwnd, rect.L, rect.T, rect.R - rect.L, rect.B - rect.T)
@@ -570,6 +594,7 @@ SetTimer(AutoSnap_NewlyStartedWindows, 2000)
 ; Layout Presets (per monitor)
 ; =========================
 
+; Loescht Leaf-/Fensterzuordnungen und Auswahlinfos fuer den Monitor.
 Layout_ClearMonitorState(mon) {
     global LeafWindows, WinToLeaf, CurrentLeafSelection, CurrentHighlight
     delKeys := []
@@ -601,6 +626,7 @@ Layout_ClearMonitorState(mon) {
     }
 }
 
+; Setzt das Layout eines Monitors zurueck und waehlt das erste Leaf.
 Layout_ResetMonitor(mon) {
     global Layouts
     if (Layouts.Has(mon))
@@ -611,6 +637,7 @@ Layout_ResetMonitor(mon) {
     Layout_SelectFirstLeaf(mon)
 }
 
+; Preset: Erzeugt Spaltenlayout gem. Gewichten fracs.
 Layout_SetMonitorColumns(mon, fracs) {
     global Layouts
     if !(fracs is Array)
@@ -641,6 +668,7 @@ Layout_SetMonitorColumns(mon, fracs) {
     Layout_SelectFirstLeaf(mon)
 }
 
+; Preset: Erzeugt 2x2-Quadrantenlayout fuer den Monitor.
 Layout_SetMonitorQuadrants(mon) {
     global Layouts
     Layout_ResetMonitor(mon)
@@ -665,6 +693,7 @@ Layout_SetMonitorQuadrants(mon) {
 }
 
 ; Wählt ein stabiles erstes Leaf (links oben) für den Monitor
+; Waehlt das links-oben gelegene erste Leaf aus.
 Layout_SelectFirstLeaf(mon) {
     Layout_Ensure(mon)
     rects := Layout_AllLeafRects(mon)

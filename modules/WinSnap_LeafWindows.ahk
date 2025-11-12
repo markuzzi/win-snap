@@ -1,10 +1,12 @@
 ; =========================
 ; Leaf-Window Lists
 ; =========================
+; Bildet einen eindeutigen Key "mon:leaf" fuer Zuordnungs-Maps.
 LeafKey(mon, leafId) {
     return mon ":" leafId
 }
 
+; Entfernt ungueltige Fensterhandles aus der Leaf-Liste fuer key.
 LeafCleanupList(key) {
     global LeafWindows
     if (!LeafWindows.Has(key))
@@ -27,6 +29,7 @@ LeafCleanupList(key) {
         LeafWindows.Delete(key)
 }
 
+; Haengt ein Fenster an ein Leaf an und aktualisiert Mapping/Selektion.
 LeafAttachWindow(hwnd, mon, leafId, updateSelection := true) {
     global LeafWindows, WinToLeaf
     LogInfo(Format("LeafAttachWindow: hwnd={}, mon={}, leaf={}, updateSel={}", hwnd, mon, leafId, updateSelection))
@@ -61,6 +64,7 @@ LeafAttachWindow(hwnd, mon, leafId, updateSelection := true) {
 
 }
 
+; Loest ein Fenster von seinem Leaf; optional Mapping entfernen.
 LeafDetachWindow(hwnd, removeMapping := false) {
     global LeafWindows, WinToLeaf
     if (!WinToLeaf.Has(hwnd))
@@ -85,6 +89,7 @@ LeafDetachWindow(hwnd, removeMapping := false) {
         WinToLeaf.Delete(hwnd)
 }
 
+; Bestimmt das oberste Fenster des Leafs (Z-Order, mit Bereinigung).
 LeafGetTopWindow(mon, leafId) {
     global LeafWindows
     key := LeafKey(mon, leafId)
@@ -136,6 +141,7 @@ LeafGetTopWindow(mon, leafId) {
     return 0
 }
 
+; Liefert die bereinigte, geordnete Fensterliste eines Leafs.
 LeafGetOrderedList(mon, leafId) {
     global LeafWindows
     key := LeafKey(mon, leafId)

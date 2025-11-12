@@ -13,6 +13,7 @@ RButton:: {
 }
 #HotIf
 
+; Gibt an, ob DragSnap aktuell aktiv ist.
 DragSnap_IsActive() {
     global DragSnap
     return DragSnap.active
@@ -29,6 +30,7 @@ Esc:: {
 }
 #HotIf
 
+; Startet DragSnap (RMB waehrend LMB-Drag) und zeigt Ziel-Overlay.
 DragSnap_Start() {
     global DragSnap, DragSnapTimerMs
     if (DragSnap.active)
@@ -65,6 +67,7 @@ DragSnap_Start() {
     LogInfo(Format("DragSnap_Start: hwnd={}, mon={}, leaf={}", hUnder, mon, leaf))
 }
 
+; Ticker: verfolgt die Maus und aktualisiert Overlay/Leaf.
 DragSnap_Tick(*) {
     global DragSnap
     if (!DragSnap.active) {
@@ -99,12 +102,14 @@ DragSnap_Tick(*) {
     }
 }
 
+; Aktualisiert das Overlay fuer die derzeit anvisierte Leaf-Area.
 DragSnap_UpdateOverlay(mon, leaf) {
     global DragSnapOverlayColor
     r := GetLeafRectPx(mon, leaf)
     ShowRectOverlay([r], DragSnapOverlayColor, 0)
 }
 
+; Snapt das gezogene Fenster in die letzte Leaf-Area (bei LButton Up).
 DragSnap_Drop() {
     global DragSnap
     if (!DragSnap.active)
@@ -126,6 +131,7 @@ DragSnap_Drop() {
     }
 }
 
+; Bricht DragSnap ab, blendet Overlays aus und setzt Status zurueck.
 DragSnap_Cancel() {
     global DragSnap
     try SetTimer(DragSnap_Tick, 0)
@@ -135,6 +141,7 @@ DragSnap_Cancel() {
     LogDebug("DragSnap_Cancel: canceled")
 }
 
+; Liefert den Monitorindex, der den Punkt (x,y) enthaelt.
 FindMonitorByPoint(x, y) {
     count := MonitorGetCount()
     if (count <= 0)

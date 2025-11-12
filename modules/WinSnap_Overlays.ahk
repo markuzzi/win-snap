@@ -2,6 +2,7 @@
 ; WinSnap_Overlays.ahk (optimiert, nutzt Utils.GetLeafRectPx)
 ; =========================
 
+; Stellt sicher, dass die Overlay-Datenstruktur initialisiert ist.
 OverlayEnsure() {
     global SnapOverlay
     if (!IsObject(SnapOverlay))
@@ -10,6 +11,7 @@ OverlayEnsure() {
         SnapOverlay.edges := []
 }
 
+; Entfernt und zerstoert alle aktuell angezeigten Overlay-Elemente.
 OverlayClear() {
     global SnapOverlay
     OverlayEnsure()
@@ -22,6 +24,7 @@ OverlayClear() {
     LogDebug("OverlayClear: cleared all edges")
 }
 
+; Fuegt ein abgerundetes, transparentes Rechteck-Overlay hinzu.
 OverlayAddRect(rect, color, thickness := 0) {
     global SnapOverlay, OverlayOpacity
     OverlayEnsure()
@@ -91,6 +94,7 @@ OverlayAddRect(rect, color, thickness := 0) {
 
 
 
+; Zeigt mehrere Rechtecke als Overlay fuer eine Dauer (0 = persistent).
 ShowRectOverlay(rectArray, color, duration := 0) {
     OverlayClear()
 
@@ -107,11 +111,13 @@ ShowRectOverlay(rectArray, color, duration := 0) {
     LogInfo(Format("ShowRectOverlay: count={}, color={}, duration={}ms", rectArray.Length, color, duration))
 }
 
+; Blendet alle Snap-Overlays aus und leert den Zustand.
 HideSnapOverlay(*) {
     OverlayClear()
     LogDebug("HideSnapOverlay: hidden")
 }
 
+; Blitzt die Umrandung einer Leaf-Area kurz auf.
 FlashLeafOutline(mon, leafId, color := "", duration := 0) {
     global SelectionFlashColor, SelectionFlashDuration
     Layout_Ensure(mon)
@@ -122,6 +128,7 @@ FlashLeafOutline(mon, leafId, color := "", duration := 0) {
     LogInfo(Format("FlashLeafOutline: mon={}, leaf={}, color={}, dur={}ms", mon, leafId, useColor, useDuration))
 }
 
+; Zeigt alle Snap-Areas des angegebenen Monitors als Overlay an.
 ShowAllSnapAreasForMonitor(mon) {
     global OverlayColor, OverlayDuration
     Layout_Ensure(mon)
