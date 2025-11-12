@@ -132,6 +132,10 @@ GetLeafRect(mon, leafId) {
 
 Layout_AllLeafRects(mon) {
     global Layouts
+
+    LogDebug("Layout_AllLeafRects for monitor " . mon)
+    LogDebug(DumpVar(Layouts))
+
     Layout_Ensure(mon)
     if (!Layouts.Has(mon))
         return Map()
@@ -358,22 +362,22 @@ Layout_LoadAll() {
         if (monIdx > monCount)
             continue  ; Monitor existiert nicht mehr
         nodes := Map()
-        if (layout.HasOwnProp("nodes")) {
-            for id, node in layout.nodes {
+        if (IsObject(layout) && layout.Has("nodes")) {
+            for id, node in layout["nodes"] {
                 nid := Layout_ToInt(id, 1)
                 nodes[nid] := {
                     id: nid,
-                    parent: Layout_ToInt(node.HasOwnProp("parent") ? node.parent : 0, 0),
-                    split: node.HasOwnProp("split") ? node.split : "",
-                    frac: node.HasOwnProp("frac") ? node.frac : 0.5,
-                    a: Layout_ToInt(node.HasOwnProp("a") ? node.a : 0, 0),
-                    b: Layout_ToInt(node.HasOwnProp("b") ? node.b : 0, 0)
+                    parent: Layout_ToInt(node.Has("parent") ? node["parent"] : 0, 0),
+                    split: node.Has("split") ? node["split"] : "",
+                    frac: node.Has("frac") ? node["frac"] : 0.5,
+                    a: Layout_ToInt(node.Has("a") ? node["a"] : 0, 0),
+                    b: Layout_ToInt(node.Has("b") ? node["b"] : 0, 0)
                 }
             }
         }
         Layouts[monIdx] := {
-            root: Layout_ToInt(layout.HasOwnProp("root") ? layout.root : 1, 1),
-            next: Layout_ToInt(layout.HasOwnProp("next") ? layout.next : (nodes.Count + 1), nodes.Count + 1),
+            root: Layout_ToInt(layout.Has("root") ? layout["root"] : 1, 1),
+            next: Layout_ToInt(layout.Has("next") ? layout["next"] : (nodes.Count + 1), nodes.Count + 1),
             nodes: nodes
         }
     }
@@ -390,6 +394,20 @@ Layout_LoadAll() {
         if (mon > count) {
             Layouts.Delete(mon)
         }
+    }
+
+    ; Anzahl SnapAreas (Leaf-Knoten) pro Monitor ins Log schreiben
+    for mon, layout in Layouts {
+        leafCount := 0
+        try {
+            if (IsObject(layout) && layout.HasOwnProp("nodes") && IsObject(layout.nodes)) {
+                for id, node in layout.nodes {
+                    if (node.split = "")
+                        leafCount += 1
+                }
+            }
+        }
+        LogInfo(Format("Layout_LoadAll: Loaded {} snapAreas for monitor {}", leafCount, mon))
     }
 
     LogInfo(Format("Layout_LoadAll: loaded layouts for {} monitors", Layouts.Count))

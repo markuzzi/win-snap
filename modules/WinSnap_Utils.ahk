@@ -120,6 +120,47 @@ DebugLog(msg) {
     LogDebug(msg)
 }
 
+DumpVar(var, indent := 0) {
+    out := ""
+    pad := ""
+    Loop indent
+        pad .= "  "
+
+    try {
+        if IsObject(var) {
+            if var is Map {
+                if var.Count = 0 {
+                    out .= pad . "{}"
+                } else {
+                    out .= pad . "{Map}`n"
+                    for k, v in var {
+                        out .= pad . "  [" . DumpVar(k) . "] => " . LTrim(DumpVar(v, indent + 1)) . "`n"
+                    }
+                }
+            } else if var is Array {
+                out .= pad . "[Array]`n"
+                for i, v in var {
+                    out .= pad . "  [" . i . "] => " . LTrim(DumpVar(v, indent + 1)) . "`n"
+                }
+            } else {
+                ; out .= pad . "{Object:" . Type(var) . "}`n"
+                out .= pad . "{" . Type(var) . "}`n"
+                for k in var.OwnProps() {
+                    out .= pad . "  ." . k . " => " . LTrim(DumpVar(var.%k%, indent + 1)) . "`n"
+                }
+            }
+        } else {
+            ; out .= pad . "(" . Type(var) . ") " . var
+            out .= pad . var
+        }
+    } catch Error as e {
+        out .= pad . "<Error: " . e.Message . ">"
+    }
+
+    return out
+}
+
+
 ; --- Small helpers ---------------------------------------------------------
 StrJoin(arr, sep := "") {
     if !(arr is Array)
