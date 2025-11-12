@@ -132,10 +132,6 @@ GetLeafRect(mon, leafId) {
 
 Layout_AllLeafRects(mon) {
     global Layouts
-
-    LogDebug("Layout_AllLeafRects for monitor " . mon)
-    LogDebug(DumpVar(Layouts))
-
     Layout_Ensure(mon)
     if (!Layouts.Has(mon))
         return Map()
