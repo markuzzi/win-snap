@@ -51,7 +51,7 @@ global EfbSkip := { classes: Map(), processes: Map() }        ; EFB-Korrektur ko
 global EfbShrinkOnly := { classes: Map(), processes: Map() }   ; EFB nur schrumpfen, nicht vergrößern
 global ActivateOnAreaSwitch := true    ; Beim Snap-Area-Wechsel Fenster fokussieren? (false = nur Auswahl/Highlight)
 global LoggingEnabled := true          ; Logging ein/aus
-global LoggingLevel := 2               ; 0=aus, 1=INFO, 2=DEBUG, 3=TRACE
+global LoggingLevel := 1               ; 0=aus, 1=INFO, 2=DEBUG, 3=TRACE
 global LoggingPath := FrameCompLogPath ; Pfad zur Logdatei
 global ScriptPaused := false           ; eigener Pause-Status (Hotkeys + Timer)
 
@@ -71,6 +71,7 @@ global ScriptPaused := false           ; eigener Pause-Status (Hotkeys + Timer)
 #Include ".\modules\WinSnap_WindowSearch.ahk"
 #Include ".\modules\WinSnap_Grid.ahk"
 #Include ".\modules\WinSnap_HotkeyOverlay.ahk"
+#Include ".\modules\WinSnap_App.ahk"
 
 InitTrayIcon()
 ShowTrayTip("WinSnap geladen - Layouts bereit", 1500)
@@ -225,42 +226,9 @@ Esc:: {
     ExitApp()
 }
 
-; Schaltet Hotkeys und relevante Timer pausiert/aktiv (Toggle).
-TogglePause() {
-    global ScriptPaused
-    newState := !ScriptPaused
-    ScriptPaused := newState
-    try {
-        Suspend(newState)
-    }
-    ; Timer steuern: Active-Highlight und AutoSnap-NewWindows
-    try {
-        SetTimer(UpdateActiveHighlight, newState ? 0 : 150)
-    }
-    try {
-        SetTimer(AutoSnap_NewlyStartedWindows, newState ? 0 : 2000)
-    }
-    if (newState)
-        HideHighlight()
-    ShowTrayTip(newState ? "Pausiert" : "Aktiv", 1200)
-    LogInfo(Format("TogglePause: {}", newState ? "paused" : "resumed"))
-    UpdateTrayTooltip()
-}
-
 ; =========================
 ; Layout Preset Hotkeys (pro aktueller Monitor)
 ; =========================
-
-; Helper to get current monitor index
-; Liefert den Monitorindex des aktuell aktiven Fensters (Fallback 1).
-GetCurrentMonitorIndex() {
-    win := GetActiveWindow()
-    if (win) {
-        mi := GetMonitorIndexAndArea(win.hwnd)
-        return mi.index
-    }
-    return 1
-}
 
 ; Alt+Ctrl+Win+1: Fullscreen (ein Leaf)
 ^#!1:: {
@@ -313,47 +281,3 @@ GetCurrentMonitorIndex() {
     LogInfo("Preset: 50/50 on all monitors")
 }
 
-; --------------------
-; Tray Icon utilities
-; --------------------
-; Initialisiert das Tray-Icon und setzt den Tooltip.
-InitTrayIcon() {
-    ico := A_ScriptDir "\WinSnap.ico"
-    try {
-        if (FileExist(ico))
-            TraySetIcon(ico)
-        else
-            TraySetIcon("imageres.dll", 202)
-    }
-    catch {
-        try TraySetIcon("shell32.dll", 44)
-    }
-    UpdateTrayTooltip()
-}
-
-; Aktualisiert den Tray-Tooltip basierend auf dem Pausenstatus.
-UpdateTrayTooltip() {
-    global ScriptPaused
-    tip := ScriptPaused ? "WinSnap — Pausiert" : "WinSnap — Aktiv"
-    try A_IconTip := tip
-}
-
-; Zeigt einen TrayTip für eine begrenzte Zeit und blendet ihn danach aus.
-; Zeigt einen TrayTip fuer eine begrenzte Zeit und blendet ihn danach aus.
-ShowTrayTip(msg, ms := 1500, icon := "") {
-    try {
-        if (icon != "")
-            TrayTip "WinSnap", msg, icon
-        else
-            TrayTip "WinSnap", msg
-    }
-    try {
-        if (ms > 0)
-            SetTimer(ShowTrayTip_Hide, -ms)
-    }
-}
-
-; Blendet den aktuell angezeigten TrayTip aus.
-ShowTrayTip_Hide() {
-    try TrayTip()
-}
