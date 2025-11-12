@@ -15,7 +15,7 @@ HotkeyOverlay_Init() {
     try {
         WinSetTransparent(200, g) ; 0..255
     }
-    catch {
+    catch Error as e {
         LogError("HotkeyOverlay_Init: WinSetTransparent failed")
     }
     ; Inhalte
@@ -70,7 +70,7 @@ HotkeyOverlay_UpdateText() {
         try {
             HotkeyOverlay.text.Value := HotkeyOverlay_BuildText()
         }
-        catch {
+        catch Error as e {
             LogError("HotkeyOverlay_UpdateText: updating text failed")
         }
     }
@@ -103,13 +103,13 @@ HotkeyOverlay_Show() {
         try {
             HotkeyOverlay_ApplyRounded(HotkeyOverlay.gui)
         }
-        catch {
+        catch Error as e {
             LogError("HotkeyOverlay_Show: ApplyRounded failed")
         }
         HotkeyOverlay.shown := true
         LogInfo("HotkeyOverlay_Show")
     }
-    catch {
+    catch Error as e {
         LogError("HotkeyOverlay_Show: move/show failed")
     }
 }
@@ -124,7 +124,7 @@ HotkeyOverlay_Hide(force := false) {
     try {
         HotkeyOverlay.gui.Hide()
     }
-    catch {
+    catch Error as e {
         LogError("HotkeyOverlay_Hide: hide failed")
     }
     HotkeyOverlay.shown := false
@@ -152,21 +152,21 @@ HotkeyOverlay_ApplyRounded(gui) {
     ; Prefer DWM: DWMWA_WINDOW_CORNER_PREFERENCE = 33, DWMWCP_ROUND = 2
     pref := 2
     try {
-        DllCall("dwmapi\\DwmSetWindowAttribute", "ptr", hwnd, "int", 33, "ptr", &pref, "int", 4, "int")
+        DllCall("DwmSetWindowAttribute", "ptr", hwnd, "int", 33, "ptr", &pref, "int", 4, "int")
         return
     }
-    catch {
+    catch Error as e {
         LogError("HotkeyOverlay_ApplyRounded failed with DwmSetWindowAttribute")
     }
     ; Fallback: apply rounded region
     try {
         gui.GetPos(, , &w, &h)
         radius := 20
-        rgn := DllCall("gdi32\\CreateRoundRectRgn", "int", 0, "int", 0, "int", w, "int", h, "int", radius, "int", radius, "ptr")
+        rgn := DllCall("CreateRoundRectRgn", "int", 0, "int", 0, "int", w, "int", h, "int", radius, "int", radius, "ptr")
         if (rgn)
-            DllCall("user32\\SetWindowRgn", "ptr", hwnd, "ptr", rgn, "int", true)
+            DllCall("SetWindowRgn", "ptr", hwnd, "ptr", rgn, "int", true)
     }
-    catch {
+    catch Error as e {
         LogError("HotkeyOverlay_ApplyRounded failed with CreateRoundRectRgn and SetWindowRgn")
     }
 }

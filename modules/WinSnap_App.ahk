@@ -10,20 +10,20 @@ TogglePause() {
     try {
         Suspend(newState)
     }
-    catch {
+    catch Error as e {
         LogError("TogglePause: Suspend failed")
     }
     ; Timer steuern: Active-Highlight und AutoSnap-NewWindows
     try {
         SetTimer(UpdateActiveHighlight, newState ? 0 : 150)
     }
-    catch {
+    catch Error as e {
         LogError("TogglePause: SetTimer(UpdateActiveHighlight) failed")
     }
     try {
         SetTimer(AutoSnap_NewlyStartedWindows, newState ? 0 : 2000)
     }
-    catch {
+    catch Error as e {
         LogError("TogglePause: SetTimer(AutoSnap_NewlyStartedWindows) failed")
     }
     if (newState)
@@ -52,11 +52,11 @@ InitTrayIcon() {
         else
             TraySetIcon("imageres.dll", 202)
     }
-    catch {
+    catch Error as e {
         try {
             TraySetIcon("shell32.dll", 44)
         }
-        catch {
+        catch Error as e {
             LogError("InitTrayIcon: TraySetIcon fallback failed")
         }
     }
@@ -70,7 +70,7 @@ UpdateTrayTooltip() {
     try {
         A_IconTip := tip
     }
-    catch {
+    catch Error as e {
         LogError("UpdateTrayTooltip: setting tooltip failed")
     }
 }
@@ -83,14 +83,14 @@ ShowTrayTip(msg, ms := 1500, icon := "") {
         else
             TrayTip "WinSnap", msg
     }
-    catch {
+    catch Error as e {
         LogError("ShowTrayTip: TrayTip failed")
     }
     try {
         if (ms > 0)
             SetTimer(ShowTrayTip_Hide, -ms)
     }
-    catch {
+    catch Error as e {
         LogError("ShowTrayTip: SetTimer failed")
     }
 }
@@ -100,7 +100,7 @@ ShowTrayTip_Hide() {
     try {
         TrayTip()
     }
-    catch {
+    catch Error as e {
         LogError("ShowTrayTip_Hide: TrayTip hide failed")
     }
 }

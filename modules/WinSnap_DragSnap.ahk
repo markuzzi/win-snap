@@ -40,7 +40,7 @@ DragSnap_Start() {
     try {
         MouseGetPos &mx, &my, &hUnder
     }
-    catch {
+    catch Error as e {
         LogError("DragSnap_Start: MouseGetPos failed")
         return
     }
@@ -51,7 +51,7 @@ DragSnap_Start() {
         if (!IsCollectibleSnapWindow(hUnder))
             return
     }
-    catch {
+    catch Error as e {
         LogError("DragSnap_Start: IsCollectibleSnapWindow failed")
     }
     mon := FindMonitorByPoint(mx, my)
@@ -70,13 +70,13 @@ DragSnap_Start() {
     try {
         ApplyLeafHighlight(mon, leaf)
     }
-    catch {
+    catch Error as e {
         LogError("DragSnap_Start: ApplyLeafHighlight failed")
     }
     try {
         SetTimer(DragSnap_Tick, DragSnapTimerMs)
     }
-    catch {
+    catch Error as e {
         LogError("DragSnap_Start: SetTimer failed")
     }
     LogInfo(Format("DragSnap_Start: hwnd={}, mon={}, leaf={}", hUnder, mon, leaf))
@@ -89,7 +89,7 @@ DragSnap_Tick(*) {
         try {
             SetTimer(DragSnap_Tick, 0)
         }
-        catch {
+        catch Error as e {
             LogError("DragSnap_Tick: stop timer failed")
         }
         return
@@ -103,7 +103,7 @@ DragSnap_Tick(*) {
     try {
         MouseGetPos &mx, &my
     }
-    catch {
+    catch Error as e {
         LogError("DragSnap_Tick: MouseGetPos failed")
         return
     }
@@ -122,7 +122,7 @@ DragSnap_Tick(*) {
         try {
             ApplyLeafHighlight(mon, leaf)
         }
-        catch {
+        catch Error as e {
             LogError("DragSnap_Tick: ApplyLeafHighlight failed")
         }
         LogTrace(Format("DragSnap_Tick: mon={}, leaf={} (updated)", mon, leaf))
@@ -144,7 +144,7 @@ DragSnap_Drop() {
     try {
         SetTimer(DragSnap_Tick, 0)
     }
-    catch {
+    catch Error as e {
         LogError("DragSnap_Drop: stop timer failed")
     }
     HideSnapOverlay()
@@ -160,13 +160,13 @@ DragSnap_Drop() {
         try {
             DllCall("ReleaseCapture")
         }
-        catch {
+        catch Error as e {
             LogError("DragSnap_Drop: ReleaseCapture failed")
         }
         SnapToLeaf(hwnd, mon, leaf)
         LogInfo(Format("DragSnap_Drop: snapped hwnd={} to mon={}, leaf={}", hwnd, mon, leaf))
     }
-    catch {
+    catch Error as e {
         LogError("DragSnap_Drop: snapping failed")
     }
 }
@@ -177,7 +177,7 @@ DragSnap_Cancel() {
     try {
         SetTimer(DragSnap_Tick, 0)
     }
-    catch {
+    catch Error as e {
         LogError("DragSnap_Cancel: stop timer failed")
     }
     HideSnapOverlay()

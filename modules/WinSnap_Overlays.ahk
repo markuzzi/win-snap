@@ -1,4 +1,4 @@
-﻿; =========================
+; =========================
 ; WinSnap_Overlays.ahk (optimiert, nutzt Utils.GetLeafRectPx)
 ; =========================
 
@@ -19,7 +19,7 @@ OverlayClear() {
         try {
             edge.Destroy()
         }
-        catch {
+        catch Error as e {
             LogError("OverlayClear: edge.Destroy failed")
         }
     }
@@ -93,7 +93,7 @@ OverlayAddRect(rect, color, thickness := 0) {
         try {
             g.Destroy()
         }
-        catch {
+        catch Error as e {
             ; ignore
         }
     }
@@ -110,7 +110,7 @@ ShowRectOverlay(rectArray, color, duration := 0) {
         try {
             OverlayAddRect(rect, color)
         }
-        catch {
+        catch Error as e {
             LogError("ShowRectOverlay: OverlayAddRect failed")
         }
     }
@@ -119,7 +119,7 @@ ShowRectOverlay(rectArray, color, duration := 0) {
         try {
             SetTimer(HideSnapOverlay, -Abs(duration))
         }
-        catch {
+        catch Error as e {
             LogError("ShowRectOverlay: SetTimer failed")
         }
     LogInfo(Format("ShowRectOverlay: count={}, color={}, duration={}ms", rectArray.Length, color, duration))

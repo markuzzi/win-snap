@@ -1,4 +1,4 @@
-﻿; =========================
+; =========================
 ; Snap / UnSnap / Grid-Navigation
 ; =========================
 
@@ -250,7 +250,7 @@ AdjustBoundaryForActive(whichArrow) {
         try {
             parent := Layout_FindAxisSplitBetweenLeaves(mon, leaf, neighbor, axis)
         }
-        catch {
+        catch Error as e {
             parent := 0
             LogError("AdjustBoundaryForActive: find split between leaves failed")
         }
@@ -474,7 +474,7 @@ CycleWindowInLeaf(direction) {
         try {
             SetTimer(ClearCycleReorderSuppression, -250)
         }
-        catch {
+        catch Error as e {
             LogError("CycleWindowInLeaf: SetTimer failed")
         }
     }
@@ -486,7 +486,7 @@ ClearCycleReorderSuppression(*) {
         global SuppressActivationReorder
         SuppressActivationReorder := false
     }
-    catch {
+    catch Error as e {
         LogError("ClearCycleReorderSuppression: failed")
     }
 }
@@ -706,7 +706,7 @@ ExpandOrReduceWindow(dir) {
             try {
                 ApplyLeafHighlight(st.mon, st.baseLeaf)
             }
-            catch {
+            catch Error as e {
                 LogError("ExpandOrReduceWindow: ApplyLeafHighlight failed (reduce)")
             }
             }
@@ -756,7 +756,7 @@ ExpandOrReduceWindow(dir) {
             }
         }
     }
-    catch {
+    catch Error as e {
         LogError("ExpandOrReduceWindow: pills reserve apply failed")
     }
 
@@ -765,7 +765,7 @@ ExpandOrReduceWindow(dir) {
     try {
         ApplyLeafHighlight(mon, baseLeaf)
     }
-    catch {
+    catch Error as e {
         LogError("ExpandOrReduceWindow: ApplyLeafHighlight failed")
     }
     ExpandedWindows[hwnd] := { mon:mon, baseLeaf:baseLeaf, dir:dir, neighbor:neighbor, attached:attached }

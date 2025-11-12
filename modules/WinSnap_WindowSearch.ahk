@@ -76,9 +76,9 @@ WindowSearch_Open() {
         WindowSearch.gui.Show("AutoSize")
         WindowSearch.gui.GetPos(, , &guiW, &guiH)
     }
-    catch {
+    catch Error as e {
         guiW := 420, guiH := 260
-        LogError("WindowSearch_Open: Show/GetPos failed")
+        LogException(e, "WindowSearch_Open: Show/GetPos failed")
     }
     gx := rect.L + ((rect.R - rect.L) - guiW) / 2
     gy := rect.T + 40
@@ -87,8 +87,8 @@ WindowSearch_Open() {
         WindowSearch.gui.Show()
         WindowSearch.edit.Focus()
     }
-    catch {
-        LogError("WindowSearch_Open: Move/Show/Focus failed")
+    catch Error as e {
+        LogException(e, "WindowSearch_Open: Move/Show/Focus failed")
     }
     LogInfo(Format("WindowSearch_Open: mon={}, leaf={}, items={} ", ctx.mon, ctx.leaf, WindowSearch.items.Length))
 }
@@ -101,8 +101,8 @@ WindowSearch_Close() {
     try {
         WindowSearch.gui.Hide()
     }
-    catch {
-        LogError("WindowSearch_Close: Hide failed")
+    catch Error as e {
+        LogException(e, "WindowSearch_Close: Hide failed")
     }
     WindowSearch.active := false
     LogInfo("WindowSearch_Close")
@@ -207,35 +207,6 @@ WindowSearch_CompareTitle(a, b, *) {
     if (cmp > 0)
         return 1
     return 0
-}
-
-; Einfache, stabile Array-Sortierung mit optionalem Vergleichs-Callback.
-ArraySort(arr, compareFn := "") {
-    if (!(arr is Array))
-        throw Error("ArraySort() erwartet ein Array.")
-    if (arr.Length < 2)
-        return arr.Clone()
-
-    sorted := arr.Clone()
-    len := sorted.Length
-
-    ; Bubble-Sort (einfach, stabil, v2-kompatibel)
-    loop len - 1 {
-        i := A_Index
-        j := 1
-        while (j <= len - i) {
-            a := sorted[j]
-            b := sorted[j + 1]
-            cmp := compareFn ? compareFn(a, b) : (a > b ? 1 : (a < b ? -1 : 0))
-            if (cmp > 0) {
-                tmp := sorted[j]
-                sorted[j] := sorted[j + 1]
-                sorted[j + 1] := tmp
-            }
-            j += 1
-        }
-    }
-    return sorted
 }
 
 

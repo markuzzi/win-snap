@@ -58,7 +58,7 @@ LeafAttachWindow(hwnd, mon, leafId, updateSelection := true) {
     try {
         SaveLeafAssignment(mon, leafId, hwnd)
     }
-    catch {
+    catch Error as e {
         MsgBox "Fehler beim Speichern der Fenster-Zuordnung!"
     }
 
@@ -113,13 +113,13 @@ LeafGetTopWindow(mon, leafId) {
                         break
                     }
                 }
-                catch {
+                catch Error as e {
                     ; ignore invalid handle
                 }
             }
         }
     }
-    catch {
+    catch Error as e {
         LogError("LeafGetTopWindow: WinGetList failed")
     }
 

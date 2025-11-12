@@ -56,7 +56,7 @@ HideHighlight() {
         try {
             HL.gui.Hide()
         }
-        catch {
+        catch Error as e {
             LogError("HideHighlight: gui.Hide failed")
         }
     }
@@ -96,7 +96,7 @@ UpdateActiveHighlight(*) {
         if (IsSet(DragSnap) && DragSnap.active)
             return
     }
-    catch {
+    catch Error as e {
         LogError("UpdateActiveHighlight: DragSnap check failed")
     }
     manual := GetManualNavigationContext()

@@ -64,7 +64,7 @@ EnsureRestorable(hwnd) {
     try {
         mm := WinGetMinMax("ahk_id " hwnd)
     }
-    catch {
+    catch Error as e {
         mm := 0
     }
     if (mm = 0)
@@ -75,7 +75,7 @@ EnsureRestorable(hwnd) {
         try {
             mm := WinGetMinMax("ahk_id " hwnd)
         }
-        catch {
+        catch Error as e {
             mm := 0
         }
         if (mm = 0)
@@ -99,7 +99,7 @@ LogWrite(levelNum, levelName, msg) {
         stamp := FormatTime(, "yyyy-MM-dd HH:mm:ss")
         FileAppend(stamp " | " levelName " | " msg "`n", path, "UTF-8")
     }
-    catch {
+    catch Error as e {
         ; Avoid recursive logging here
     }
 }
@@ -174,6 +174,38 @@ DumpVar(var, indent := 0) {
     }
 
     return out
+}
+
+; Logs a caught exception with optional context and best-effort details.
+LogException(e, context := "") {
+    msg := context
+    if (msg != "")
+        msg .= ": "
+    try {
+        msg .= (e.HasOwnProp("Message") ? e.Message : "<no message>")
+    }
+    catch Error as e {
+        msg .= "<message unavailable>"
+    }
+    try {
+        if (e.HasOwnProp("What") && e.What != "")
+            msg .= " | What=" . e.What
+    }
+    catch Error as e {
+    }
+    try {
+        if (e.HasOwnProp("File") && e.HasOwnProp("Line"))
+            msg .= " | at " . e.File . ":" . e.Line
+    }
+    catch Error as e {
+    }
+    try {
+        if (e.HasOwnProp("Extra") && e.Extra != "")
+            msg .= " | Extra=" . LTrim(DumpVar(e.Extra))
+    }
+    catch Error as e {
+    }
+    LogError(msg)
 }
 
 
@@ -285,7 +317,7 @@ MoveWindow(hwnd, x, y, w, h) {
         mi := GetMonitorIndexAndArea(hwnd)
         monIdx := mi.index
     }
-    catch {
+    catch Error as e {
         monIdx := 0
         DebugLog("GetMonitorIndexAndArea failed in MoveWindow")
     }
@@ -307,7 +339,7 @@ MoveWindow(hwnd, x, y, w, h) {
             DebugLog("Skip cached offset due to EFB override policy")
         }
     }
-    catch {
+    catch Error as e {
         DebugLog("FrameComp cache lookup failed")
     }
 
@@ -378,7 +410,7 @@ MoveWindow(hwnd, x, y, w, h) {
             try {
                 WinMove x1, y1, w1, h1, "ahk_id " hwnd
             }
-            catch {
+            catch Error as e {
                 DebugLog("WinMove corrected failed")
             }
             Sleep 10
@@ -392,7 +424,7 @@ MoveWindow(hwnd, x, y, w, h) {
                 DebugLog(Format("Cached margins for key {}: L={},T={},R={},B={}", cacheKey, mL, mT, mR, mB))
             }
         }
-        catch {
+        catch Error as e {
             DebugLog("FrameComp cache store failed")
         }
         } else {
@@ -410,7 +442,7 @@ MoveWindow(hwnd, x, y, w, h) {
             }
         }
     }
-    catch {
+    catch Error as e {
         DebugLog("ApplyLeafHighlight after MoveWindow failed")
     }
 
@@ -440,4 +472,34 @@ ToPixelRect(mon, r) {
 ; Liefert das Rechteck einer Leaf-Area in Pixelkoordinaten.
 GetLeafRectPx(mon, leafId) {
     return ToPixelRect(mon, GetLeafRect(mon, leafId))
+}
+
+
+; Einfache, stabile Array-Sortierung mit optionalem Vergleichs-Callback.
+ArraySort(arr, compareFn := "") {
+    if (!(arr is Array))
+        throw Error("ArraySort() erwartet ein Array.")
+    if (arr.Length < 2)
+        return arr.Clone()
+
+    sorted := arr.Clone()
+    len := sorted.Length
+
+    ; Bubble-Sort (einfach, stabil, v2-kompatibel)
+    loop len - 1 {
+        i := A_Index
+        j := 1
+        while (j <= len - i) {
+            a := sorted[j]
+            b := sorted[j + 1]
+            cmp := compareFn ? compareFn(a, b) : (a > b ? 1 : (a < b ? -1 : 0))
+            if (cmp > 0) {
+                tmp := sorted[j]
+                sorted[j] := sorted[j + 1]
+                sorted[j + 1] := tmp
+            }
+            j += 1
+        }
+    }
+    return sorted
 }

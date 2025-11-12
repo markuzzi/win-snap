@@ -153,7 +153,7 @@ GetLeafRect(mon, leafId) {
             }
         }
     }
-    catch {
+    catch Error as e {
         LogError("GetLeafRect: failed to apply pills top reserve")
     }
     return rect
@@ -507,7 +507,7 @@ Layout_ToInt(value, default := 0) {
     try {
         return Integer(value)
     }
-    catch {
+    catch Error as e {
         return default
     }
 }
@@ -594,7 +594,7 @@ FindWindow(exe, title := "") {
             if (thisExe = exe && (title = "" || InStr(thisTitle, title)))
                 return hwnd
         }
-        catch {
+        catch Error as e {
             LogError("FindWindow: query failed")
         }
     }
@@ -676,7 +676,7 @@ Layout_ClearMonitorState(mon) {
     try {
         ManualNav_Clear(mon)
     }
-    catch {
+    catch Error as e {
         LogError("Layout_ResetMonitor: ManualNav_Clear failed")
     }
     try {

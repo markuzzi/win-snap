@@ -21,10 +21,10 @@ WindowPills_Init() {
             OnMessage(0x0202, WP_OnMouse) ; WM_LBUTTONUP
             WindowPills.hooks := true
         }
-        catch {
+        catch Error as e {
             LogError("WindowPills_Update: reserve update block failed")
         }
-        catch {
+        catch Error as e {
             LogError("WindowPills_Init: OnMessage hook failed")
         }
     }
@@ -38,7 +38,7 @@ WindowPills_Clear() {
         try {
             pill.Destroy()
         }
-        catch {
+        catch Error as e {
             LogError("WindowPills_Clear: pill.Destroy failed")
         }
     }
@@ -48,8 +48,8 @@ WindowPills_Clear() {
     try {
         WindowPills.guiToHwnd := Map()
     }
-    catch {
-        LogError("WindowPills_Clear: reset guiToHwnd failed")
+    catch Error as e {
+        LogException(e, "WindowPills_Clear: reset guiToHwnd failed")
     }
 }
 
@@ -68,12 +68,12 @@ WindowPills_Toggle() {
                 try {
                     ReapplySubtree(mon, Layouts[mon].root)
                 }
-                catch {
+                catch Error as e {
                     LogError("WindowPills_Toggle: ReapplySubtree failed")
                 }
             }
         }
-        catch {
+        catch Error as e {
             LogError("WindowPills_Toggle: reclaim loop failed")
         }
     } else {
@@ -82,7 +82,7 @@ WindowPills_Toggle() {
         try {
             WindowPills.lastSig := ""
         }
-        catch {
+        catch Error as e {
             LogError("WindowPills_Toggle: reset lastSig failed")
         }
         WindowPills_Update()
@@ -115,7 +115,7 @@ WP_BuildStateSignature() {
     try {
         focused := WinGetID("A")
     }
-    catch {
+    catch Error as e {
         focused := 0
         LogError("WindowPills: WinGetID failed for signature")
     }
@@ -128,10 +128,10 @@ WP_BuildStateSignature() {
             ids.Push("" hwnd)
         ; ignore order in signature to avoid rebuild flicker on activation reordering
         try {
-            ids.Sort()
+            ids := ArraySort(ids, StrCompare)
         }
-        catch {
-            LogError("WindowPills: sorting signature ids failed")
+        catch Error as e {
+            LogException(e, "WindowPills: sorting signature ids failed")
         }
         sig.Push(key ":" StrJoin(ids, ","))
     }
@@ -160,14 +160,14 @@ WP_CreatePill(x, y, text, isActive, targetHwnd := 0) {
     try {
         WinSetTransparent(WindowPillsOpacity, g)
     }
-    catch {
-        LogError("WindowPills: WinSetTransparent failed")
+    catch Error as e {
+        LogException(e, "WindowPills: WinSetTransparent failed")
     }
     try {
         g.SetFont(Format("s{} {}", WindowPillsFontSize, tColor), WindowPillsFont)
     }
-    catch {
-        LogError("WindowPills: SetFont failed")
+    catch Error as e {
+        LogException(e, "WindowPills: SetFont failed")
     }
     pic := 0
     iconOk := false
@@ -179,7 +179,7 @@ WP_CreatePill(x, y, text, isActive, targetHwnd := 0) {
                 iconOk := true
             }
         }
-        catch {
+        catch Error as e {
             LogError("WindowPills: AddPicture (icon) failed")
         }
     }
@@ -206,7 +206,7 @@ WP_CreatePill(x, y, text, isActive, targetHwnd := 0) {
         try {
             pic.Move(ix, iy, WindowPillsIconSize, WindowPillsIconSize)
         }
-        catch {
+        catch Error as e {
             LogError("WindowPills: icon Move failed")
         }
     }
@@ -224,8 +224,8 @@ WP_CreatePill(x, y, text, isActive, targetHwnd := 0) {
         if (IsObject(pic))
             pic.OnEvent("Click", (*) => WP_OnPillClick(targetHwnd))
     }
-    catch {
-        LogError("WindowPills: event hookup failed")
+    catch Error as e {
+        LogException(e, "WindowPills: event hookup failed")
     }
     ; return as object to allow later updates
     return { gui:g, ctrl:ctrl, pic:pic }
@@ -276,7 +276,7 @@ WindowPills_Update() {
         try {
             r := GetLeafRectPx(mon, leafId)
         }
-        catch {
+        catch Error as e {
             r := 0
             LogError("WindowPills_Update: GetLeafRectPx failed")
         }
@@ -288,7 +288,7 @@ WindowPills_Update() {
         try {
             sysActive := WinGetID("A")
         }
-        catch {
+        catch Error as e {
             sysActive := 0
         }
         if (sysActive) {
@@ -315,7 +315,7 @@ WindowPills_Update() {
             try {
                 title := WinGetTitle("ahk_id " hwnd)
             }
-            catch {
+            catch Error as e {
                 title := ""
             }
             if (title = "")
@@ -327,7 +327,7 @@ WindowPills_Update() {
             try {
                 obj.ctrl.GetPos(, , &tw, &th)
             }
-            catch {
+            catch Error as e {
                 tw := 40, th := 18
             }
             hasIcon := (IsSet(WindowPillsShowIcons) && WindowPillsShowIcons && obj.HasOwnProp("pic") && obj.pic)
@@ -368,7 +368,7 @@ WindowPills_Update() {
                 try {
                     ReapplySubtree(mon, leafId)
                 }
-                catch {
+                catch Error as e {
                     LogError("WindowPills_Update: ReapplySubtree failed")
                 }
             }
@@ -386,7 +386,7 @@ WindowPills_Update() {
             try {
                 it.gui.Show("NA")
             }
-            catch {
+            catch Error as e {
                 LogError("WindowPills_Update: show pill failed (first)")
             }
                 WP_SetPillRegion(it.gui, pw, ph)
@@ -399,7 +399,7 @@ WindowPills_Update() {
                 try {
                     it.gui.Show("NA")
                 }
-                catch {
+                catch Error as e {
                     LogError("WindowPills_Update: show pill failed (inline)")
                 }
                 WP_SetPillRegion(it.gui, pw, ph)
@@ -415,7 +415,7 @@ WindowPills_Update() {
                 try {
                     it.gui.Show("NA")
                 }
-                catch {
+                catch Error as e {
                     LogError("WindowPills_Update: show pill failed (wrap)")
                 }
                 WP_SetPillRegion(it.gui, pw, ph)
@@ -432,7 +432,7 @@ WindowPills_Update() {
         try {
             g.Destroy()
         }
-        catch {
+        catch Error as e {
             LogError("WindowPills_Update: destroy old pill failed")
         }
     }
@@ -442,13 +442,13 @@ WindowPills_UpdateTick(*) {
     try {
         WindowPills_Update()
     }
-    catch {
-        LogError("WindowPills_UpdateTick: update failed")
+    catch Error as e {
+        LogException(e, "WindowPills_UpdateTick: update failed")
     }
 }
 
 ; Start periodic update
-SetTimer(WindowPills_UpdateTick, 300)
+SetTimer(WindowPills_UpdateTick, 100)
 
 ; --- Click handling ---------------------------------------------------------
 
@@ -456,12 +456,12 @@ WP_SetPillRegion(gui, w, h) {
     try {
         global WindowPillsRadius
         radius := WindowPillsRadius
-        hRgn := DllCall("gdi32\\CreateRoundRectRgn", "Int", 0, "Int", 0, "Int", w, "Int", h, "Int", radius, "Int", radius, "Ptr")
+        hRgn := DllCall("CreateRoundRectRgn", "Int", 0, "Int", 0, "Int", w, "Int", h, "Int", radius, "Int", radius, "Ptr")
         if (hRgn)
-            DllCall("user32\\SetWindowRgn", "Ptr", gui.Hwnd, "Ptr", hRgn, "Int", true)
+            DllCall("SetWindowRgn", "Ptr", gui.Hwnd, "Ptr", hRgn, "Int", true)
     }
-    catch {
-        LogError("WP_SetPillRegion: failed to set region")
+    catch Error as e {
+        LogException(e, "WP_SetPillRegion: failed to set region")
     }
 }
 
@@ -479,18 +479,19 @@ WP_LayoutPillContent(gui, ctrlText, ctrlPic, w, h) {
         ty := WindowPillsPaddingY + Floor((h - 2*WindowPillsPaddingY - th) / 2)
         ctrlText.Move(tx, ty)
     }
-    catch {
-        LogError("WP_LayoutPillContent: layout failed")
+    catch Error as e {
+        LogException(e, "WP_LayoutPillContent: layout failed")
     }
 }
 
 WP_ApplyDwmCorners(gui) {
     try {
-        pref := 2 ; DWMWCP_ROUND
-        DllCall("dwmapi\\DwmSetWindowAttribute", "ptr", gui.Hwnd, "int", 33, "ptr", &pref, "int", 4, "int")
+        pref := Buffer(4, 0)  ; 4 Bytes für int (DWMWCP_ROUND = 2)
+        NumPut("Int", 2, pref)
+        DllCall("dwmapi\DwmSetWindowAttribute", "ptr", gui.Hwnd, "int", 33, "ptr", pref.Ptr, "int", 4, "int")
     }
-    catch {
-        LogError("WP_ApplyDwmCorners: DWM attribute failed")
+    catch Error as e {
+        LogException(e, "WP_ApplyDwmCorners: DWM attribute failed")
     }
 }
 
@@ -508,8 +509,8 @@ WP_OnPillClick(targetHwnd) {
             WinActivate "ahk_id " targetHwnd
         }
     }
-    catch {
-        LogError("WP_OnPillClick: failed")
+    catch Error as e {
+        LogException(e, "WP_OnPillClick: failed")
     }
 }
 
@@ -523,7 +524,7 @@ WP_RefreshActiveStyles() {
         try {
             sysActive := WinGetID("A")
         }
-        catch {
+        catch Error as e {
             sysActive := 0
         }
         for hwnd, info in WinToLeaf {
@@ -549,8 +550,8 @@ WP_RefreshActiveStyles() {
             WP_SetPillAppearance(g, isActive)
         }
     }
-    catch {
-        LogError("WP_RefreshActiveStyles: failed")
+    catch Error as e {
+        LogException(e, "WP_RefreshActiveStyles: failed")
     }
 }
 
@@ -567,7 +568,7 @@ WP_SetPillAppearance(g, isActive) {
                 try {
                     t := c.Type
                 }
-                catch {
+                catch Error as e {
                     t := ""
                 }
                 if (t = "Text") {
@@ -580,17 +581,17 @@ WP_SetPillAppearance(g, isActive) {
                 try {
                     ctrl.SetFont(Format("s{} {}", WindowPillsFontSize, col), WindowPillsFont)
                 }
-                catch {
+                catch Error as e {
                     LogError("WP_SetPillAppearance: SetFont failed")
                 }
             }
         }
-        catch {
+        catch Error as e {
             LogError("WP_SetPillAppearance: inner failed")
         }
     }
-    catch {
-        LogError("WP_SetPillAppearance: outer failed")
+    catch Error as e {
+        LogException(e, "WP_SetPillAppearance: outer failed")
     }
 }
 
@@ -604,7 +605,7 @@ WP_OnMouse(wParam, lParam, msg, hwnd) {
             WP_OnPillClick(target)
         }
     }
-    catch {
-        LogError("WP_OnMouse: failed")
+    catch Error as e {
+        LogException(e, "WP_OnMouse: failed")
     }
 }
