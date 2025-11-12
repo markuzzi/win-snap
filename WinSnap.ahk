@@ -55,6 +55,26 @@ global LoggingLevel := 1               ; 0=aus, 1=INFO, 2=DEBUG, 3=TRACE
 global LoggingPath := FrameCompLogPath ; Pfad zur Logdatei
 global ScriptPaused := false           ; eigener Pause-Status (Hotkeys + Timer)
 
+; Window Pills Overlay (config)
+global WindowPillsEnabled := false     ; Anzeige der Fenster-Pills über SnapAreas
+global WindowPillsMaxTitle := 20       ; Max. Zeichen pro Titel (abschneiden mit …)
+global WindowPillsOpacity := 220       ; 0..255
+global WindowPillsRadius := 10         ; Rundung der Ecken
+global WindowPillsPaddingX := 8
+global WindowPillsPaddingY := 4
+global WindowPillsGap := 6             ; Abstand zwischen Pills
+global WindowPillsMarginX := 8         ; Abstand vom Area-Rand (links/rechts)
+global WindowPillsMarginY := 8         ; Abstand vom Area-Rand (oben)
+global WindowPillsFont := "Segoe UI"
+global WindowPillsFontSize := 9
+global WindowPillsTextColor := "cBlack"
+global WindowPillsActiveTextColor := "cWhite"
+global WindowPillColor := "Silver"
+global WindowPillColorActive := "Gray"
+global WindowPillsReserve := Map()      ; (mon:leaf) -> reservierte Höhe oberhalb Area
+global WindowPillsReserveAllLeaves := true
+global WindowPillsReserveDefaultPx := (2*WindowPillsMarginY) + (2*WindowPillsPaddingY) + Ceil(WindowPillsFontSize*1.6)
+
 ; Drag-Snap (RButton while LButton dragging)
 ; Drag-Snap moved to module
 
@@ -76,6 +96,7 @@ global ScriptPaused := false           ; eigener Pause-Status (Hotkeys + Timer)
 InitTrayIcon()
 ShowTrayTip("WinSnap geladen - Layouts bereit", 1500)
 #Include ".\\modules\\WinSnap_DragSnap.ahk"
+#Include ".\\modules\\WinSnap_WindowPills.ahk"
 
 ; =========================
 ; Hotkeys
@@ -215,6 +236,11 @@ Esc:: {
     HotkeyOverlay_Toggle()
 }
 
+; Toggle Window Pills overlay
+^!w:: {
+    WindowPills_Toggle()
+}
+
 ; Pause/Resume (Hotkeys und relevante Timer)
 ^!p:: {
     TogglePause()
@@ -280,4 +306,3 @@ Esc:: {
     }
     LogInfo("Preset: 50/50 on all monitors")
 }
-

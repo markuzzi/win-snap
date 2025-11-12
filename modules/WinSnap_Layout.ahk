@@ -131,10 +131,29 @@ ApplySnapGap(rect) {
     return rect
 }
 
-; Liefert das Leaf-Rechteck inkl. angewendetem SnapGap.
+; Liefert das Leaf-Rechteck inkl. SnapGap und optionalem oberen Reservebereich
+; für Fenster-Pills (wenn aktiviert).
 GetLeafRect(mon, leafId) {
     rect := Layout_NodeRect(mon, leafId)
-    return ApplySnapGap(rect)
+    rect := ApplySnapGap(rect)
+    ; Reserve oberhalb der Area einziehen, wenn Pills aktiv sind
+    try {
+        global WindowPillsEnabled, WindowPillsReserve, WindowPillsReserveAllLeaves, WindowPillsReserveDefaultPx
+        if (IsSet(WindowPillsEnabled) && WindowPillsEnabled) {
+            res := 0
+            key := mon ":" leafId
+            if (IsSet(WindowPillsReserve) && (WindowPillsReserve is Map) && WindowPillsReserve.Has(key))
+                res := WindowPillsReserve[key]
+            else if (IsSet(WindowPillsReserveAllLeaves) && WindowPillsReserveAllLeaves && IsSet(WindowPillsReserveDefaultPx))
+                res := WindowPillsReserveDefaultPx
+            if (res > 0) {
+                rect.T += Round(res)
+                if (rect.B <= rect.T)
+                    rect.B := rect.T + 1
+            }
+        }
+    }
+    return rect
 }
 
 ; Liefert eine Map aller Leaf-Rechtecke des Monitors.

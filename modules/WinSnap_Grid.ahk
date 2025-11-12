@@ -647,6 +647,24 @@ ExpandOrReduceWindow(dir) {
     rB := Layout_NodeRect(mon, neighbor)
     combined := { L:Min(rA.L, rB.L), T:Min(rA.T, rB.T), R:Max(rA.R, rB.R), B:Max(rA.B, rB.B) }
     combined := ApplySnapGap(combined)
+    ; Apply reserved top for pills if enabled (use max of both leaves)
+    try {
+        global WindowPillsEnabled, WindowPillsReserve, WindowPillsReserveAllLeaves, WindowPillsReserveDefaultPx
+        if (IsSet(WindowPillsEnabled) && WindowPillsEnabled) {
+            keyA := mon ":" baseLeaf
+            keyB := mon ":" neighbor
+            resA := (IsSet(WindowPillsReserve) && WindowPillsReserve.Has(keyA)) ? WindowPillsReserve[keyA]
+                    : ((IsSet(WindowPillsReserveAllLeaves) && WindowPillsReserveAllLeaves) ? WindowPillsReserveDefaultPx : 0)
+            resB := (IsSet(WindowPillsReserve) && WindowPillsReserve.Has(keyB)) ? WindowPillsReserve[keyB]
+                    : ((IsSet(WindowPillsReserveAllLeaves) && WindowPillsReserveAllLeaves) ? WindowPillsReserveDefaultPx : 0)
+            res := Max(resA, resB)
+            if (res > 0) {
+                combined.T += Round(res)
+                if (combined.B <= combined.T)
+                    combined.B := combined.T + 1
+            }
+        }
+    }
 
     EnsureHistory(hwnd)
     MoveWindow(hwnd, combined.L, combined.T, combined.R - combined.L, combined.B - combined.T)
