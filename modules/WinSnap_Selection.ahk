@@ -44,6 +44,12 @@ SelectLeaf(mon, leafId, source := "manual") {
     else
         ManualNav_Clear(mon)
     ApplyLeafHighlight(mon, leafId)
+    try {
+        WindowPills_Invalidate()
+    }
+    catch Error as e {
+        LogException(e, "SelectLeaf: WindowPills_Invalidate failed")
+    }
 }
 
 ; Liefert die aktuell ausgewaehlte Leaf-Id fuer den Monitor.
@@ -111,6 +117,13 @@ LeafRecordActivation(hwnd) {
     }
     arr.InsertAt(1, hwnd)
     SelectLeaf(info.mon, info.leaf, "auto")
+
+    try {
+        WindowPills_Invalidate()
+    }
+    catch Error as e {
+        LogException(e, "LeafRecordActivation: WindowPills_Invalidate failed")
+    }
 }
 
 ; Ermittelt Navigationskontext (Monitor, Leaf, hwnd) anhand aktivem Fenster.

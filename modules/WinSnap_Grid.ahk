@@ -239,6 +239,13 @@ SplitCurrentLeaf(orient) {
         SnapToLeaf(hwnd, mon, leftOrTop)
         LastDir[hwnd] := (orient = "v") ? "left" : "top"
     }
+
+    try {
+        WindowPills_Invalidate()
+    }
+    catch Error as e {
+        LogException(e, "SplitCurrentLeaf: WindowPills_Invalidate failed")
+    }
 }
 
 ; Justiert die Teilungsgrenze der passenden Split-Gruppe um SplitStep.

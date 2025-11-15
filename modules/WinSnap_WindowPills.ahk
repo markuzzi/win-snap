@@ -1,4 +1,4 @@
-; =========================
+﻿; =========================
 ; Window Pills Overlay (floating pills per SnapArea)
 ; =========================
 
@@ -121,21 +121,51 @@ WP_BuildStateSignature() {
     }
     sig.Push("E:" (WindowPillsEnabled ? 1 : 0))
     sig.Push("M:" (IsSet(WindowPillsMaxTitle) ? WindowPillsMaxTitle : 20))
+    entries := []
     for key, arr in LeafWindows {
         ; key is "mon:leaf"
         ids := []
         for hwnd in arr
             ids.Push("" hwnd)
-        ; ignore order in signature to avoid rebuild flicker on activation reordering
+        ; sort ids for stability
         try {
             ids := ArraySort(ids, StrCompare)
         }
         catch Error as e {
             LogException(e, "WindowPills: sorting signature ids failed")
         }
-        sig.Push(key ":" StrJoin(ids, ","))
+        ; geometry
+        mon := 0, leaf := 0
+        try {
+            parts := StrSplit(key, ":")
+            if (parts.Length >= 2) {
+                mon := parts[1] + 0
+                leaf := parts[2] + 0
+            }
+        }
+        catch Error as e {
+            LogException(e, "WindowPills: parsing signature key failed")
+        }
+        rectSig := "@(0,0,0,0)"
+        if (mon && leaf) {
+            try {
+                r := GetLeafRectPx(mon, leaf)
+                rectSig := Format("@({},{},{},{})", Round(r.L), Round(r.T), Round(r.R), Round(r.B))
+            }
+            catch Error as e {
+                LogException(e, "WindowPills: GetLeafRectPx failed for signature")
+            }
+        }
+        entries.Push(key ":" StrJoin(ids, ",") rectSig)
     }
-    ; Focus intentionally excluded from signature to avoid rebuild flicker on activation
+    ; sort entries for stable signature
+    try {
+        entries := ArraySort(entries, StrCompare)
+    }
+    catch Error as e {
+        LogException(e, "WindowPills: sorting signature entries failed")
+    }
+    sig.Push("L:" StrJoin(entries, "|"))
     return StrJoin(sig, "|")
 }
 
@@ -607,5 +637,14 @@ WP_OnMouse(wParam, lParam, msg, hwnd) {
     }
     catch Error as e {
         LogException(e, "WP_OnMouse: failed")
+    }
+}
+
+; External invalidation: force a rebuild on next tick
+WindowPills_Invalidate() {
+    try {
+        global WindowPills
+        if (IsObject(WindowPills))
+            WindowPills.lastSig := ""
     }
 }

@@ -363,6 +363,13 @@ ReapplySubtree(mon, nodeId) {
     }
     SuppressMoveHighlight := wasSuppressed
     LogDebug(Format("ReapplySubtree: mon={}, node={}, leaves={} windows reapplied", mon, nodeId, leaves.Length))
+
+    try {
+        WindowPills_Invalidate()
+    }
+    catch Error as e {
+        LogException(e, "Layout_SelectFirstLeaf: WindowPills_Invalidate failed")
+    }
 }
 
 ; =========================
@@ -770,4 +777,11 @@ Layout_SelectFirstLeaf(mon) {
     }
     if (bestId)
         SelectLeaf(mon, bestId, "manual")
+
+    try {
+        WindowPills_Invalidate()
+    }
+    catch Error as e {
+        LogException(e, "Layout_SelectFirstLeaf: WindowPills_Invalidate failed")
+    }
 }
