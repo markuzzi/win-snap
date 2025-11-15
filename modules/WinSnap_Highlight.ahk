@@ -6,7 +6,8 @@ HL_Init() {
     global HL
     if (HL.init)
         return
-    g := Gui("+AlwaysOnTop -Caption +ToolWindow +E0x20 +DPIScale") ; click-through
+    ; Use pixel coordinates (no DPI scaling) to align with window rects
+    g := Gui("+AlwaysOnTop -Caption +ToolWindow +E0x20 -DPIScale") ; click-through
     g.BackColor := "Teal"
     HL.gui := g
     HL.init := true

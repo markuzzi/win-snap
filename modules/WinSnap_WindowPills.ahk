@@ -152,9 +152,9 @@ WP_CreatePill(x, y, text, isActive, targetHwnd := 0) {
     color := isActive ? WindowPillColorActive : WindowPillColor
     tColor := isActive ? WindowPillsActiveTextColor : WindowPillsTextColor
 
-    ; Layered + NoActivate (but NOT Transparent) so the pill can receive clicks
+    ; Layered + NoActivate; use pixel coordinates (no DPI scaling) for exact alignment
     ; 0x80000 (WS_EX_LAYERED) | 0x08000000 (WS_EX_NOACTIVATE)
-    style := "+AlwaysOnTop -Caption +ToolWindow +E0x08080000 +DPIScale"
+    style := "+AlwaysOnTop -Caption +ToolWindow +E0x08080000 -DPIScale"
     g := Gui(style)
     g.BackColor := color
     try {

@@ -203,8 +203,13 @@ SplitCurrentLeaf(orient) {
     ; Prüfen, ob die zu teilende SnapArea leer ist, damit wir nach dem Split
     ; kein Fenster automatisch hinein verschieben.
     wasEmpty := true
-    if (Layout_IsLeaf(mon, leaf))
+    prevWindows := []
+    if (Layout_IsLeaf(mon, leaf)) {
         wasEmpty := !LeafHasWindows(mon, leaf)
+        if (!wasEmpty) {
+            prevWindows := LeafGetOrderedList(mon, leaf).Clone()
+        }
+    }
     DebugLog(Format("SplitCurrentLeaf mon={}, leaf={}, orient={}, wasEmpty={}", mon, leaf, orient, wasEmpty))
     Layout_SplitLeaf(mon, leaf, orient)
 
@@ -214,6 +219,23 @@ SplitCurrentLeaf(orient) {
     leftOrTop := nAfter.a
     SelectLeaf(mon, leftOrTop, "manual")
     if (!wasEmpty) {
+        ; Move all windows of the previous area into the new left/top leaf
+        for w in prevWindows {
+            if (w = hwnd)
+                continue
+            try {
+                if (DllCall("IsWindow", "ptr", w) && WinExist("ahk_id " w)) {
+                    EnsureHistory(w)
+                    rMove := GetLeafRectPx(mon, leftOrTop)
+                    MoveWindow(w, rMove.L, rMove.T, rMove.R - rMove.L, rMove.B - rMove.T)
+                    LeafAttachWindow(w, mon, leftOrTop, false)
+                }
+            }
+            catch Error as e {
+                LogException(e, "SplitCurrentLeaf: moving window into left/top failed")
+            }
+        }
+        ; Active window last to set highlight and ordering
         SnapToLeaf(hwnd, mon, leftOrTop)
         LastDir[hwnd] := (orient = "v") ? "left" : "top"
     }

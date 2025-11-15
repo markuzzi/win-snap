@@ -62,7 +62,8 @@ OverlayAddRect(rect, color, thickness := 0) {
     opacity := (IsSet(OverlayOpacity) && OverlayOpacity > 0) ? OverlayOpacity : 150
 
     try {
-        style := "+AlwaysOnTop -Caption +ToolWindow +E0x80020 +DPIScale"
+        ; Use pixel coordinates for overlays to avoid DPI scaling offsets
+        style := "+AlwaysOnTop -Caption +ToolWindow +E0x80020 -DPIScale"
         g := Gui(style)
         g.BackColor := color
         g.Show("NA")  ; NoActivate
