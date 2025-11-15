@@ -95,12 +95,13 @@ global WindowPillsReserveDefaultPx := (2*WindowPillsMarginY) + (2*WindowPillsPad
 #Include ".\modules\WinSnap_WindowSearch.ahk"
 #Include ".\modules\WinSnap_Grid.ahk"
 #Include ".\modules\WinSnap_HotkeyOverlay.ahk"
+#Include ".\modules\WinSnap_DragSnap.ahk"
+#Include ".\modules\WinSnap_WindowPills.ahk"
+#Include ".\modules\WinSnap_DragResize.ahk"
 #Include ".\modules\WinSnap_App.ahk"
 
 InitTrayIcon()
 ShowTrayTip("WinSnap geladen - Layouts bereit", 1500)
-#Include ".\\modules\\WinSnap_DragSnap.ahk"
-#Include ".\\modules\\WinSnap_WindowPills.ahk"
 
 ; =========================
 ; Hotkeys
@@ -239,6 +240,32 @@ Esc:: {
 ^!vkBF:: {
     HotkeyOverlay_Toggle()
 }
+
+; =========================
+; Drag-Resize/Move/Opacity (Alt modifiers)
+; =========================
+
+; Alt + Linksklick halten: Fenster unter Maus verschieben
+!LButton:: {
+    DR_StartAltDragMove()
+}
+
+; Alt + Rechtsklick halten: Fenstergröße ändern (Ecke abhängig von Startposition)
+!RButton:: {
+    DR_StartAltDragResize()
+}
+
+; Alt + Mausrad runter ODER Alt + XButton2: Fenster unter Maus minimieren
+!WheelDown::DR_MinimizeUnderMouse()
+!XButton2::DR_MinimizeUnderMouse()
+
+; Alt+Ctrl+Win + Plus/Minus: aktive Fenster-Transparenz anpassen
+!^#+::DR_AdjustActiveTransparency(15)
+!^#-::DR_AdjustActiveTransparency(-15)
+
+; Alt+Win + Mausrad: aktive Fenster-Transparenz anpassen
+!#WheelUp::DR_AdjustActiveTransparency(15)
+!#WheelDown::DR_AdjustActiveTransparency(-15)
 
 ; Toggle Window Pills overlay
 ^!w:: {
