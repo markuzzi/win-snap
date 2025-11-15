@@ -79,6 +79,12 @@ global WindowPillsReserve := Map()      ; (mon:leaf) -> reservierte Höhe oberha
 global WindowPillsReserveAllLeaves := true
 global WindowPillsReserveDefaultPx := (2*WindowPillsMarginY) + (2*WindowPillsPaddingY) + Ceil(WindowPillsFontSize*1.6)
 
+; Window Pills Update/Refresh behavior (reduces flicker)
+global WindowPillsUpdateInterval := 300       ; ms; 0 = disable periodic updates (invalidate-only)
+global WindowPillsOnDemandOnly := false       ; true = update only when layout/selection changes
+global WindowPillsMinRebuildInterval := 250   ; ms guard between full rebuilds
+global WindowPillsReserveChangeTolerance := 2  ; px; only reapply if change >= tolerance
+
 ; Drag-Snap (RButton while LButton dragging)
 ; Drag-Snap moved to module
 

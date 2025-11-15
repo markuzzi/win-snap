@@ -7,7 +7,8 @@
 ; window titles inside each SnapArea, anchored at the top-left corner of the
 ; area. The current window appears with a darker color.
 
-WindowPills := { pills: [], shown:false, lastSig:"", guiToHwnd: Map(), hooks:false }
+; Track last rebuild time to rate‑limit updates
+WindowPills := { pills: [], shown:false, lastSig:"", guiToHwnd: Map(), hooks:false, lastRebuild:0 }
 
 WindowPills_Init() {
     global WindowPills
@@ -285,7 +286,22 @@ WindowPills_Update() {
         WP_RefreshActiveStyles()
         return
     }
+    ; Rate‑limit rebuilds slightly to avoid flicker when geometry bounces
+    try {
+        global WindowPillsMinRebuildInterval
+        minGap := (IsSet(WindowPillsMinRebuildInterval) ? WindowPillsMinRebuildInterval : 250)
+    }
+    catch {
+        minGap := 250
+    }
+    now := A_TickCount
+    if ((now - WindowPills.lastRebuild) < minGap) {
+        ; Defer once
+        SetTimer(WindowPills_UpdateTick, -minGap)
+        return
+    }
     WindowPills.lastSig := sig
+    WindowPills.lastRebuild := now
 
     ; Double-buffered rebuild to avoid visible gaps
     global WindowPills
@@ -295,6 +311,17 @@ WindowPills_Update() {
 
     ; Iterate all leaves with windows
     for key, arr in LeafWindows {
+        ; Proactively drop dead hwnds so pills vanish immediately after close
+        try {
+            LeafCleanupList(key)
+            if (LeafWindows.Has(key))
+                arr := LeafWindows[key]
+            else
+                arr := []
+        }
+        catch Error as e {
+            LogException(e, "WindowPills_Update: LeafCleanupList failed")
+        }
         ; Parse key "mon:leaf"
         parts := StrSplit(key, ":")
         if (parts.Length != 2)
@@ -389,12 +416,20 @@ WindowPills_Update() {
         totH += lineH + WindowPillsMarginY  ; bottom margin
         reserveH := Max(WindowPillsMarginY*2 + 1, totH)
 
-        ; Update reserve map and reapply window positions if changed
+        ; Update reserve map and reapply window positions if changed (with tolerance)
         try {
             global WindowPillsReserve
             prev := WindowPillsReserve.Has(mon ":" leafId) ? WindowPillsReserve[mon ":" leafId] : -1
             WindowPillsReserve[mon ":" leafId] := reserveH
-            if (prev != reserveH) {
+            tol := 0
+            try {
+                global WindowPillsReserveChangeTolerance
+                tol := IsSet(WindowPillsReserveChangeTolerance) ? WindowPillsReserveChangeTolerance : 2
+            }
+            catch {
+                tol := 2
+            }
+            if (Abs(prev - reserveH) >= tol) {
                 try {
                     ReapplySubtree(mon, leafId)
                 }
@@ -477,8 +512,18 @@ WindowPills_UpdateTick(*) {
     }
 }
 
-; Start periodic update
-SetTimer(WindowPills_UpdateTick, 100)
+; Start periodic update (configurable). If disabled, rely on Invalidate hooks.
+try {
+    global WindowPillsUpdateInterval, WindowPillsOnDemandOnly
+    interval := IsSet(WindowPillsUpdateInterval) ? WindowPillsUpdateInterval : 300
+    if (IsSet(WindowPillsOnDemandOnly) && WindowPillsOnDemandOnly)
+        interval := 0
+    SetTimer(WindowPills_UpdateTick, interval)
+}
+catch Error as err {
+    ; Fallback to a modest default if configuration fails
+    SetTimer(WindowPills_UpdateTick, 300)
+}
 
 ; --- Click handling ---------------------------------------------------------
 
@@ -646,5 +691,14 @@ WindowPills_Invalidate() {
         global WindowPills
         if (IsObject(WindowPills))
             WindowPills.lastSig := ""
+        ; If periodic timer is disabled, trigger a single-shot update now
+        try {
+            global WindowPillsOnDemandOnly
+            if (IsSet(WindowPillsOnDemandOnly) && WindowPillsOnDemandOnly)
+                SetTimer(WindowPills_UpdateTick, -10)
+        }
+        catch Error as e {
+            LogException(e, "WindowPills_Invalidate: check on-demand failed")
+        }
     }
 }

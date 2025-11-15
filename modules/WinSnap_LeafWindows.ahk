@@ -62,6 +62,14 @@ LeafAttachWindow(hwnd, mon, leafId, updateSelection := true) {
         MsgBox "Fehler beim Speichern der Fenster-Zuordnung!"
     }
 
+    ; Invalidate pills so overlay reflects new membership immediately
+    try {
+        WindowPills_Invalidate()
+    }
+    catch Error as e {
+        LogException(e, "LeafAttachWindow: WindowPills_Invalidate failed")
+    }
+
 }
 
 ; Loest ein Fenster von seinem Leaf; optional Mapping entfernen.
@@ -87,6 +95,14 @@ LeafDetachWindow(hwnd, removeMapping := false) {
     }
     if (removeMapping)
         WinToLeaf.Delete(hwnd)
+
+    ; Invalidate pills so a closed/removed window disappears immediately
+    try {
+        WindowPills_Invalidate()
+    }
+    catch Error as e {
+        LogException(e, "LeafDetachWindow: WindowPills_Invalidate failed")
+    }
 }
 
 ; Bestimmt das oberste Fenster des Leafs (Z-Order, mit Bereinigung).
