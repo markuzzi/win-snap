@@ -26,6 +26,9 @@ global WinHistory  := Map()       ; hwnd -> {x,y,w,h}
 global LastDir     := Map()       ; hwnd -> "left"|"right"|"top"|"bottom"|"up"
 global WinToLeaf   := Map()       ; hwnd -> {mon: idx, leaf: id}
 global LeafWindows := Map()       ; (mon:leaf) -> [hwnd,...]
+global AutoSnapBlackList := Map() ; exe (lowercase) -> true
+global ShellHookMsg := 0          ; Message-ID f�r SHELLHOOK
+global AutoSnapBlackList := Map() ; exe -> true (vom AutoSnap ausgenommen)
 
 ; Layout pro Monitor:
 ; Layouts[mon] = { root: id, next: id, nodes: Map() }
@@ -107,6 +110,7 @@ global WindowPillsReserveChangeTolerance := 2  ; px; only reapply if change >= t
 #Include ".\modules\WinSnap_App.ahk"
 
 InitTrayIcon()
+InitShellHook()
 ShowTrayTip("WinSnap geladen - Layouts bereit", 1500)
 
 ; =========================
@@ -276,6 +280,11 @@ Esc:: {
 ; Toggle Window Pills overlay
 ^!w:: {
     WindowPills_Toggle()
+}
+
+; Ctrl+Alt+B: aktives Fenster fuer AutoSnap blacklisten/de-blacklisten
+^!b:: {
+    ToggleBlacklistForActiveWindow()
 }
 
 ; Pause/Resume (Hotkeys und relevante Timer)

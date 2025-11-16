@@ -52,6 +52,7 @@ Legend: `#` = Win, `!` = Alt, `^` = Ctrl, `+` = Shift
 - `^!r`: Reload script
 - `^!/?`: Toggle hotkey overlay while held (vkBF)
 - `^!w`: Toggle window pills overlay
+- `^!b`: Toggle AutoSnap blacklist for the active window (by process)
 - `^!p`: Pause/resume hotkeys and timers
 - `^!q`: Quit script
 

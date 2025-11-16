@@ -104,3 +104,91 @@ ShowTrayTip_Hide() {
         LogError("ShowTrayTip_Hide: TrayTip hide failed")
     }
 }
+
+; Initialisiert einen Shell-Hook, um Fenster-Ereignisse (Creation/Activation) zu empfangen
+; und AutoSnap direkt auszulösen (statt nur per Timer-Polling).
+InitShellHook() {
+    global ShellHookMsg
+    try {
+        ; Script-Fenster für Shell-Hook registrieren
+        DllCall("RegisterShellHookWindow", "ptr", A_ScriptHwnd)
+        ShellHookMsg := DllCall("RegisterWindowMessage", "str", "SHELLHOOK", "uint")
+        OnMessage(ShellHookMsg, ShellMessage_Handler)
+        LogInfo("InitShellHook: shell hook registered")
+    }
+    catch Error as e {
+        LogException(e, "InitShellHook failed")
+    }
+}
+
+; Handler für Shell-Hook-Messages.
+; Reagiert auf Fenster-Erstellung und -Aktivierung mit einem direkten AutoSnap-Durchlauf.
+ShellMessage_Handler(wParam, lParam, msg, hwnd) {
+    ; HSHELL_WINDOWCREATED = 1, HSHELL_WINDOWACTIVATED = 4
+    try {
+        if (wParam = 1 || wParam = 4) {
+            AutoSnap_NewlyStartedWindows()
+        }
+    }
+    catch Error as e {
+        LogException(e, "ShellMessage_Handler")
+    }
+    return 0
+}
+
+; Toggle: aktives Fenster auf AutoSnap-Blacklist setzen oder wieder entfernen.
+ToggleBlacklistForActiveWindow() {
+    global AutoSnapBlackList
+    win := GetActiveWindow()
+    if (!win)
+        return
+    hwnd := win.hwnd
+
+    try {
+        exe := WinGetProcessName("ahk_id " hwnd)
+    } catch {
+        exe := ""
+    }
+    try {
+        className := WinGetClass("ahk_id " hwnd)
+    } catch {
+        className := ""
+    }
+    if (!exe && !className)
+        return
+
+    if (!IsSet(AutoSnapBlackList) || !(AutoSnapBlackList is Map))
+        AutoSnapBlackList := Map()
+
+    exeKey := exe ? "exe:" . StrLower(exe) : ""
+    classKey := className ? "class:" . className : ""
+    comboKey := (exeKey && classKey) ? exeKey . "|class:" . className : ""
+
+    ; Kombination exe+class ist maßgeblich; alte Einzel-Keys werden nur zum Aufräumen berücksichtigt.
+    isBlack := false
+    if (comboKey && AutoSnapBlackList.Has(comboKey))
+        isBlack := true
+    if (!isBlack && exeKey && AutoSnapBlackList.Has(exeKey))
+        isBlack := true
+    if (!isBlack && classKey && AutoSnapBlackList.Has(classKey))
+        isBlack := true
+
+    if (isBlack) {
+        if (comboKey && AutoSnapBlackList.Has(comboKey))
+            AutoSnapBlackList.Delete(comboKey)
+        if (exeKey && AutoSnapBlackList.Has(exeKey))
+            AutoSnapBlackList.Delete(exeKey)
+        if (classKey && AutoSnapBlackList.Has(classKey))
+            AutoSnapBlackList.Delete(classKey)
+        try BlackList_Save()
+        ShowTrayTip("AutoSnap Blacklist entfernt: " . exe " (" . className . ")", 1500)
+        LogInfo(Format("ToggleBlacklistForActiveWindow: removed exe={}, class={}", exe, className))
+    } else {
+        if (comboKey)
+            AutoSnapBlackList[comboKey] := true
+        try BlackList_Save()
+        ShowTrayTip("AutoSnap Blacklist hinzugefügt: " . exe " (" . className . ")", 1500)
+        LogInfo(Format("ToggleBlacklistForActiveWindow: added exe={}, class={}", exe, className))
+    }
+}
+

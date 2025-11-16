@@ -524,6 +524,71 @@ Layout_GetStoragePath() {
     return A_ScriptDir "\WinSnap_layouts.json"
 }
 
+; Pfad zur AutoSnap-Blacklist-Datei im Script-Verzeichnis.
+BlackList_GetStoragePath() {
+    return A_ScriptDir "\WinSnap_BlackList.json"
+}
+
+; Laedt die AutoSnap-Blacklist aus JSON.
+BlackList_Load() {
+    global AutoSnapBlackList
+    path := BlackList_GetStoragePath()
+    AutoSnapBlackList := Map()
+    if (!FileExist(path))
+        return
+    try {
+        text := FileRead(path, "UTF-8")
+        data := jxon_load(&text)
+    } catch {
+        LogInfo("BlackList_Load: failed to read or parse file")
+        return
+    }
+    if !(data is Map)
+        return
+    ; Keys werden unverändert übernommen (z.B. "exe:foo|class:Bar").
+    for key, flag in data {
+        if (!key || !flag)
+            continue
+        AutoSnapBlackList[key] := true
+    }
+}
+
+; Speichert die aktuelle AutoSnap-Blacklist als JSON.
+BlackList_Save() {
+    global AutoSnapBlackList
+    path := BlackList_GetStoragePath()
+    if (!IsSet(AutoSnapBlackList) || !(AutoSnapBlackList is Map))
+        AutoSnapBlackList := Map()
+    data := Map()
+    for exe, flag in AutoSnapBlackList {
+        if (flag)
+            data[exe] := true
+    }
+    try {
+        f := FileOpen(path, "w", "UTF-8")
+        if (f) {
+            f.Write(jxon_dump(data, indent := 2))
+            f.Close()
+        }
+    } catch {
+        MsgBox "BlackList_Save(): Fehler beim Schreiben der BlackList-Datei!"
+    }
+    LogInfo(Format("BlackList_Save: saved to {}", path))
+}
+
+; Bestimmt, ob eine EXE/Klasse-Kombination vom AutoSnap ausgeschlossen ist.
+; Es wird nur gematcht, wenn sowohl exe als auch className vorhanden sind.
+IsBlacklistedExe(exe, className := "") {
+    global AutoSnapBlackList
+    if (!IsSet(AutoSnapBlackList) || !(AutoSnapBlackList is Map))
+        AutoSnapBlackList := Map()
+    ; Nur Kombinationen zählen: beide müssen gesetzt sein.
+    if (!exe || !className)
+        return false
+    key := "exe:" . StrLower(exe) . "|class:" . className
+    return AutoSnapBlackList.Has(key)
+}
+
 
 ; Window Leaf Assignments speichern/laden
 ; Speichert eine Zuordnung (exe+title) fuer ein Leaf des Monitors.
@@ -608,26 +673,81 @@ FindWindow(exe, title := "") {
     return 0
 }
 
-; Ermittelt neu gestartete, zugeordnete Fenster und snappt sie ggf. ins Leaf.
+; Auto-Snap fuer Fenster:
+; - Alle nicht geblacklisteten Fenster werden einer SnapArea zugeordnet.
+; - Neue Fenster ohne Leaf-Zuordnung werden in die aktuell aktive SnapArea gesnappt.
+; - Bereits zugeordnete Fenster werden bei Bedarf in ihr Leaf zurueckgesetzt (z.B. nach Restore).
 AutoSnap_NewlyStartedWindows() {
-    global Layouts
-    for mon, layout in Layouts {
-        if (!IsObject(layout) || !layout.HasOwnProp("assignments"))
+    global Layouts, WinToLeaf
+
+    ; Aktive SnapArea (Monitor + Leaf) bestimmen
+    ctx := ApplyManualNavigation(GetLeafNavigationContext())
+    if (!ctx.mon) {
+        if (MonitorGetCount() = 0)
+            return
+        ctx.mon := 1
+    }
+    Layout_Ensure(ctx.mon)
+    if (!ctx.leaf) {
+        sel := GetSelectedLeaf(ctx.mon)
+        ctx.leaf := sel ? sel : Layouts[ctx.mon].root
+    }
+    if (!ctx.leaf)
+        return
+    if (!Layouts[ctx.mon].nodes.Has(ctx.leaf))
+        ctx.leaf := Layouts[ctx.mon].root
+
+    targetMon := ctx.mon
+    targetLeaf := ctx.leaf
+
+    ; Alle Fenster durchgehen und passend einsortieren
+    try {
+        all := WinGetList()
+    } catch Error as e {
+        LogException(e, "AutoSnap_NewlyStartedWindows: WinGetList failed")
+        return
+    }
+
+    for hwnd in all {
+        if (!IsCollectibleSnapWindow(hwnd))
             continue
 
-        for entry in layout.assignments {
-            hwnd := FindWindow(entry.exe, entry.title)
-            if (hwnd) {
-                try {
-                    x := y := w := h := 0
-                    WinGetPos &x, &y, &w, &h, "ahk_id " hwnd
-                    if (x < 10 && y < 10) {
-                        ; Snap to assigned leaf
-                        SnapWindowToLeaf(hwnd, mon, entry.leaf)
-                    }
-                }
-            }
+        ; Prozessname/Klasse ermitteln und ggf. Blacklist pruefen
+        try {
+            exe := WinGetProcessName("ahk_id " hwnd)
+        } catch {
+            exe := ""
         }
+        try {
+            className := WinGetClass("ahk_id " hwnd)
+        } catch {
+            className := ""
+        }
+        if ((exe || className) && IsBlacklistedExe(exe, className))
+            continue
+
+        ; Bereits einem Leaf zugeordnet? -> sicherstellen, dass es in seinem Leaf liegt.
+        if (WinToLeaf.Has(hwnd)) {
+            info := WinToLeaf[hwnd]
+            mon := info.mon
+            leaf := info.leaf
+            Layout_Ensure(mon)
+            r := GetLeafRectPx(mon, leaf)
+            try {
+                WinGetPos &x, &y, &w, &h, "ahk_id " hwnd
+            } catch {
+                continue
+            }
+            cx := x + (w / 2)
+            cy := y + (h / 2)
+            if (cx < r.L || cx > r.R || cy < r.T || cy > r.B) {
+                SnapWindowToLeaf(hwnd, mon, leaf)
+            }
+            continue
+        }
+
+        ; Noch keinem Leaf zugeordnet -> in die aktive SnapArea einsortieren.
+        SnapWindowToLeaf(hwnd, targetMon, targetLeaf)
     }
 }
 
@@ -643,12 +763,13 @@ SnapWindowToLeaf(hwnd, mon, leafId) {
 
 
 Layout_LoadAll()
+BlackList_Load()
 
 ; Nach dem Laden des Layouts:
 SetTimer(AutoSnap_AssignedWindows, -100)
 
 ; Prüft regelmäßig auf neue Fenster, die einsortiert werden sollen
-SetTimer(AutoSnap_NewlyStartedWindows, 2000)
+; SetTimer(AutoSnap_NewlyStartedWindows, 2000)
 
 
 ; =========================
