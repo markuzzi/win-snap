@@ -2,3 +2,4 @@
 /WinSnap_layouts.json
 *.log
 .vscode
+/WinSnap_BlackList.json
