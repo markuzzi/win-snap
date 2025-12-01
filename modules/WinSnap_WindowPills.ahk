@@ -512,19 +512,6 @@ WindowPills_UpdateTick(*) {
     }
 }
 
-; Start periodic update (configurable). If disabled, rely on Invalidate hooks.
-try {
-    global WindowPillsUpdateInterval, WindowPillsOnDemandOnly
-    interval := IsSet(WindowPillsUpdateInterval) ? WindowPillsUpdateInterval : 300
-    if (IsSet(WindowPillsOnDemandOnly) && WindowPillsOnDemandOnly)
-        interval := 0
-    SetTimer(WindowPills_UpdateTick, interval)
-}
-catch Error as err {
-    ; Fallback to a modest default if configuration fails
-    SetTimer(WindowPills_UpdateTick, 300)
-}
-
 ; --- Click handling ---------------------------------------------------------
 
 WP_SetPillRegion(gui, w, h) {
@@ -688,17 +675,11 @@ WP_OnMouse(wParam, lParam, msg, hwnd) {
 ; External invalidation: force a rebuild on next tick
 WindowPills_Invalidate() {
     try {
-        global WindowPills
-        if (IsObject(WindowPills))
-            WindowPills.lastSig := ""
-        ; If periodic timer is disabled, trigger a single-shot update now
-        try {
-            global WindowPillsOnDemandOnly
-            if (IsSet(WindowPillsOnDemandOnly) && WindowPillsOnDemandOnly)
-                SetTimer(WindowPills_UpdateTick, -10)
-        }
-        catch Error as e {
-            LogException(e, "WindowPills_Invalidate: check on-demand failed")
-        }
+        ; Schedule a one-shot update shortly after the triggering event.
+        ; This keeps updates event-driven without a continuous timer.
+        SetTimer(WindowPills_UpdateTick, -10)
+    }
+    catch Error as e {
+        LogException(e, "WindowPills_Invalidate: schedule update failed")
     }
 }
