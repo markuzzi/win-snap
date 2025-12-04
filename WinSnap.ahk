@@ -57,6 +57,8 @@ global LoggingEnabled := true          ; Logging ein/aus
 global LoggingLevel := 1               ; 0=aus, 1=INFO, 2=DEBUG, 3=TRACE
 global LoggingPath := FrameCompLogPath ; Pfad zur Logdatei
 global ScriptPaused := false           ; eigener Pause-Status (Hotkeys + Timer)
+global SnappedWindowsStatusPath := A_ScriptDir "\WinSnap_SnappedWindows.json" ; aktueller Snap-Status (Process/Class)
+global SnappedWindowsWritePending := false
 global SuppressMoveHighlight := false  ; unterdrückt Highlight während Massen-Moves
 
 ; Window Pills Overlay (config)
@@ -111,6 +113,7 @@ global WindowPillsReserveChangeTolerance := 2  ; px; only reapply if change >= t
 
 InitTrayIcon()
 InitShellHook()
+SnappedWindows_Init()
 ShowTrayTip("WinSnap geladen - Layouts bereit", 1500)
 
 ; =========================
@@ -293,7 +296,7 @@ Esc:: {
 }
 
 ; Script beenden
-^!q:: {
+^#!q:: {
     LogInfo("ExitApp via hotkey")
     ExitApp()
 }

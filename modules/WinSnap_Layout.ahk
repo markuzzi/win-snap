@@ -811,6 +811,13 @@ Layout_ClearMonitorState(mon) {
         if (CurrentHighlight.mon = mon)
             HideHighlight()
     }
+
+    try {
+        SnappedWindows_ScheduleWrite()
+    }
+    catch Error as e {
+        LogException(e, "Layout_ClearMonitorState: SnappedWindows_ScheduleWrite failed")
+    }
 }
 
 ; Setzt das Layout eines Monitors zurueck und waehlt das erste Leaf.

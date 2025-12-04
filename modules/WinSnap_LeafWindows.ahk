@@ -6,6 +6,89 @@ LeafKey(mon, leafId) {
     return mon ":" leafId
 }
 
+; --- Snapped Windows Status (JSON file) -----------------------------------
+; Schreibt regelmaessig die aktuell gesnappten Fenster (inkl. Prozess/Klasse)
+; in eine JSON-Datei, damit von aussen sichtbar ist, welche Fenster Pill-Status
+; haben.
+SnappedWindows_Init() {
+    try {
+        SnappedWindows_WriteStatus()
+    }
+    catch Error as e {
+        LogException(e, "SnappedWindows_Init")
+    }
+}
+
+SnappedWindows_ScheduleWrite() {
+    global SnappedWindowsWritePending
+    if (!IsSet(SnappedWindowsWritePending))
+        SnappedWindowsWritePending := false
+    if (SnappedWindowsWritePending)
+        return
+    SnappedWindowsWritePending := true
+    try {
+        SetTimer(SnappedWindows_Flush, -50)
+    }
+    catch Error as e {
+        SnappedWindowsWritePending := false
+        LogException(e, "SnappedWindows_ScheduleWrite")
+    }
+}
+
+SnappedWindows_Flush(*) {
+    global SnappedWindowsWritePending
+    SnappedWindowsWritePending := false
+    SnappedWindows_WriteStatus()
+}
+
+SnappedWindows_WriteStatus() {
+    global WinToLeaf, SnappedWindowsStatusPath
+    if (!IsSet(SnappedWindowsStatusPath) || SnappedWindowsStatusPath = "")
+        SnappedWindowsStatusPath := A_ScriptDir "\WinSnap_SnappedWindows.json"
+    try {
+        data := []
+        for hwnd, info in WinToLeaf {
+            valid := false
+            try {
+                valid := DllCall("IsWindow", "ptr", hwnd) && WinExist("ahk_id " hwnd)
+            }
+            catch Error as e {
+                valid := false
+            }
+            if (!valid)
+                continue
+            exe := "", className := "", title := ""
+            try {
+                exe := WinGetProcessName("ahk_id " hwnd)
+            }
+            catch {
+                exe := ""
+            }
+            try {
+                className := WinGetClass("ahk_id " hwnd)
+            }
+            catch {
+                className := ""
+            }
+            try {
+                title := WinGetTitle("ahk_id " hwnd)
+            }
+            catch {
+                title := ""
+            }
+            data.Push({ hwnd:hwnd, process:exe, class:className, title:title, mon:info.mon, leaf:info.leaf })
+        }
+        f := FileOpen(SnappedWindowsStatusPath, "w", "UTF-8")
+        if (f) {
+            f.Write(jxon_dump(data, indent := 2))
+            f.Close()
+        }
+    }
+    catch Error as e {
+        LogException(e, "SnappedWindows_WriteStatus")
+    }
+}
+
 ; Entfernt ungueltige Fensterhandles aus der Leaf-Liste fuer key.
 LeafCleanupList(key) {
     global LeafWindows
@@ -59,7 +142,7 @@ LeafAttachWindow(hwnd, mon, leafId, updateSelection := true) {
         SaveLeafAssignment(mon, leafId, hwnd)
     }
     catch Error as e {
-        MsgBox "Fehler beim Speichern der Fenster-Zuordnung!"
+        LogException(e, "Fehler beim Speichern der Fenster-Zuordnung!")
     }
 
     ; Invalidate pills so overlay reflects new membership immediately
@@ -70,6 +153,7 @@ LeafAttachWindow(hwnd, mon, leafId, updateSelection := true) {
         LogException(e, "LeafAttachWindow: WindowPills_Invalidate failed")
     }
 
+    SnappedWindows_ScheduleWrite()
 }
 
 ; Loest ein Fenster von seinem Leaf; optional Mapping entfernen.
@@ -103,6 +187,8 @@ LeafDetachWindow(hwnd, removeMapping := false) {
     catch Error as e {
         LogException(e, "LeafDetachWindow: WindowPills_Invalidate failed")
     }
+
+    SnappedWindows_ScheduleWrite()
 }
 
 ; Bestimmt das oberste Fenster des Leafs (Z-Order, mit Bereinigung).

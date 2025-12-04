@@ -1,5 +1,6 @@
 .aider*
 /WinSnap_layouts.json
+/WinSnap_SnappedWindows.json
 *.log
 .vscode
 /WinSnap_BlackList.json
