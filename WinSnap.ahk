@@ -120,7 +120,12 @@ ShowTrayTip("WinSnap geladen - Layouts bereit", 1500)
 ; Hotkeys
 ; =========================
 
-#HotIf WindowSearch.active
+; Pause/Resume (always active)
+^!p:: {
+    TogglePause()
+}
+
+#HotIf !ScriptPaused && WindowSearch.active
 Up:: {
     WindowSearch_MoveSelection(-1)
     return
@@ -138,6 +143,8 @@ Esc:: {
     return
 }
 #HotIf
+
+#HotIf !ScriptPaused
 
 ; Win+Left/Right/Up/Down: durch Grid bewegen (inkl. Auto-Split beim ersten Snap)
 #Left::  GridMove("left")
@@ -290,11 +297,6 @@ Esc:: {
     ToggleBlacklistForActiveWindow()
 }
 
-; Pause/Resume (Hotkeys und relevante Timer)
-^!p:: {
-    TogglePause()
-}
-
 ; Script beenden
 ^#!q:: {
     LogInfo("ExitApp via hotkey")
@@ -355,3 +357,5 @@ Esc:: {
     }
     LogInfo("Preset: 50/50 on all monitors")
 }
+
+#HotIf

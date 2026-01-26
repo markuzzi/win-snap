@@ -4,15 +4,9 @@
 
 ; Schaltet Hotkeys und relevante Timer pausiert/aktiv (Toggle).
 TogglePause() {
-    global ScriptPaused
+    global ScriptPaused, WindowPills
     newState := !ScriptPaused
     ScriptPaused := newState
-    try {
-        Suspend(newState)
-    }
-    catch Error as e {
-        LogError("TogglePause: Suspend failed")
-    }
     ; Timer steuern: Active-Highlight und AutoSnap-NewWindows
     try {
         SetTimer(UpdateActiveHighlight, newState ? 0 : 150)
@@ -26,8 +20,64 @@ TogglePause() {
     catch Error as e {
         LogError("TogglePause: SetTimer(AutoSnap_NewlyStartedWindows) failed")
     }
-    if (newState)
-        HideHighlight()
+    if (newState) {
+        try {
+            DragSnap_Cancel()
+        }
+        catch Error as e {
+            LogError("TogglePause: DragSnap_Cancel failed")
+        }
+        try {
+            HideSnapOverlay()
+        }
+        catch Error as e {
+            LogError("TogglePause: HideSnapOverlay failed")
+        }
+        try {
+            WindowPills_Clear()
+        }
+        catch Error as e {
+            LogError("TogglePause: WindowPills_Clear failed")
+        }
+        try {
+            WindowSearch_Close()
+        }
+        catch Error as e {
+            LogError("TogglePause: WindowSearch_Close failed")
+        }
+        try {
+            HotkeyOverlay_Hide(true)
+        }
+        catch Error as e {
+            LogError("TogglePause: HotkeyOverlay_Hide failed")
+        }
+        try {
+            HideHighlight()
+        }
+        catch Error as e {
+            LogError("TogglePause: HideHighlight failed")
+        }
+    } else {
+        try {
+            UpdateActiveHighlight()
+        }
+        catch Error as e {
+            LogError("TogglePause: UpdateActiveHighlight failed")
+        }
+        try {
+            if (IsObject(WindowPills))
+                WindowPills.lastSig := ""
+        }
+        catch Error as e {
+            LogError("TogglePause: reset WindowPills lastSig failed")
+        }
+        try {
+            WindowPills_Invalidate()
+        }
+        catch Error as e {
+            LogError("TogglePause: WindowPills_Invalidate failed")
+        }
+    }
     ShowTrayTip(newState ? "Pausiert" : "Aktiv", 1200)
     LogInfo(Format("TogglePause: {}", newState ? "paused" : "resumed"))
     UpdateTrayTooltip()
@@ -125,6 +175,18 @@ InitShellHook() {
 ; Reagiert auf Fenster-Erstellung, -Zerstörung und -Aktivierung.
 ShellMessage_Handler(wParam, lParam, msg, hwnd) {
     ; HSHELL_WINDOWCREATED = 1, HSHELL_WINDOWDESTROYED = 2, HSHELL_WINDOWACTIVATED = 4
+    global ScriptPaused
+    if (IsSet(ScriptPaused) && ScriptPaused) {
+        if (wParam = 2) {
+            try {
+                LeafDetachWindow(lParam, true)
+            }
+            catch Error as e {
+                LogException(e, "ShellMessage_Handler: LeafDetachWindow paused failed")
+            }
+        }
+        return 0
+    }
     try {
         if (wParam = 1 || wParam = 4) {
             AutoSnap_NewlyStartedWindows()
@@ -197,4 +259,3 @@ ToggleBlacklistForActiveWindow() {
         LogInfo(Format("ToggleBlacklistForActiveWindow: added exe={}, class={}", exe, className))
     }
 }
-

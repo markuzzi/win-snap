@@ -623,7 +623,9 @@ SaveLeafAssignment(mon, leafId, hwnd) {
 
 ; Snappt bekannte (zugeordnete) Fenster an ihr Leaf, falls noetig.
 AutoSnap_AssignedWindows() {
-    global Layouts
+    global Layouts, ScriptPaused
+    if (IsSet(ScriptPaused) && ScriptPaused)
+        return
     for mon, layout in Layouts {
         if (!IsObject(layout) || !layout.HasOwnProp("assignments"))
             continue
@@ -678,7 +680,9 @@ FindWindow(exe, title := "") {
 ; - Neue Fenster ohne Leaf-Zuordnung werden in die aktuell aktive SnapArea gesnappt.
 ; - Bereits zugeordnete Fenster werden bei Bedarf in ihr Leaf zurueckgesetzt (z.B. nach Restore).
 AutoSnap_NewlyStartedWindows() {
-    global Layouts, WinToLeaf
+    global Layouts, WinToLeaf, ScriptPaused
+    if (IsSet(ScriptPaused) && ScriptPaused)
+        return
 
     ; Aktive SnapArea (Monitor + Leaf) bestimmen
     ctx := ApplyManualNavigation(GetLeafNavigationContext())
