@@ -45,6 +45,7 @@ HotkeyOverlay_BuildText() {
     lines.Push("Alt+Backspace/Delete           – Aktuelle Snap-Area löschen")
     lines.Push("Alt+Shift+O                    – Alle Snap-Areas anzeigen")
     lines.Push("Alt+Shift+A                    – Fenster in aktiver Area einsammeln")
+    lines.Push("Ctrl+Alt+Win+A                 – Fenster in allen Areas einsammeln")
     lines.Push("Ctrl+Shift+Up/Down             – Fenster innerhalb Area wechseln")
     lines.Push("Alt+Shift+Plus / Numpad+       – Vertikal teilen")
     lines.Push("Alt+Shift+Minus / Numpad-      – Horizontal teilen")

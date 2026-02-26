@@ -44,6 +44,7 @@ Legend: `#` = Win, `!` = Alt, `^` = Ctrl, `+` = Shift
 - `!Backspace` or `!Delete`: Remove current snap area
 - `!+o`: Briefly show all snap areas
 - `!+a`: Collect all windows into the active snap area
+- `^#!a`: Collect windows across all snap areas (assign by intersection)
 - `^+Up` / `^+Down`: Cycle windows within the current leaf (prev/next)
 - `!+Plus` (top row or numpad): Split current leaf vertically
 - `!+Minus` (top row or numpad): Split current leaf horizontally

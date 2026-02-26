@@ -219,6 +219,9 @@ Esc:: {
 ; Alt+Shift+A: alle Fenster in der aktiven Snap-Area einsammeln
 !+a::CollectWindowsInActiveLeaf()
 
+; Ctrl+Alt+Win+A: alle Fenster in ihren jeweiligen Snap-Areas einsammeln
+^#!a::CollectWindowsInAllLeaves()
+
 ; Strg+Shift+Up/Down: Fenster innerhalb einer Area wechseln
 ^+Up::   CycleWindowInLeaf("prev")
 ^+Down:: CycleWindowInLeaf("next")

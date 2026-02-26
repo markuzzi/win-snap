@@ -621,6 +621,63 @@ CollectWindowsInActiveLeaf() {
     LogInfo(Format("CollectWindowsInActiveLeaf: collected {} windows into mon={}, leaf={}", collected, ctx.mon, ctx.leaf))
 }
 
+; Sammelt passende Fenster ueber alle Leaf-Areas ein.
+; Zuordnung erfolgt ueber die groesste Schnittflaeche Fenster<->Leaf.
+CollectWindowsInAllLeaves() {
+    LogInfo("CollectWindowsInAllLeaves: start")
+    leafRects := []
+    monCount := MonitorGetCount()
+    Loop monCount {
+        mon := A_Index
+        Layout_Ensure(mon)
+        rects := Layout_AllLeafRects(mon)
+        for leafId, _ in rects
+            leafRects.Push({ mon:mon, leaf:leafId, rect:GetLeafRectPx(mon, leafId) })
+    }
+    if (leafRects.Length = 0)
+        return
+
+    ids := WinGetList()
+    collected := 0
+    for hwnd in ids {
+        if (!IsCollectibleSnapWindow(hwnd))
+            continue
+        target := FindBestIntersectingLeafForWindow(hwnd, leafRects)
+        if (!target)
+            continue
+        EnsureHistory(hwnd)
+        SnapToLeaf(hwnd, target.mon, target.leaf)
+        collected += 1
+    }
+    LogInfo(Format("CollectWindowsInAllLeaves: collected {} windows across {} leafs", collected, leafRects.Length))
+}
+
+; Ermittelt die Leaf mit der groessten Schnittflaeche zum Fenster.
+FindBestIntersectingLeafForWindow(hwnd, leafRects) {
+    if (!hwnd)
+        return 0
+    try {
+        WinGetPos &x, &y, &w, &h, "ahk_id " hwnd
+    } catch {
+        return 0
+    }
+    if (w <= 0 || h <= 0)
+        return 0
+    winRect := {L:x, T:y, R:x + w, B:y + h}
+    best := 0
+    bestArea := 0
+    for entry in leafRects {
+        area := RectIntersectionArea(winRect, entry.rect)
+        if (area <= 0)
+            continue
+        if (area > bestArea) {
+            bestArea := area
+            best := entry
+        }
+    }
+    return best
+}
+
 ; Prueft, ob ein Fenster fuer Einsammeln/Snappen geeignet ist (sichtbar, kein Systemfenster).
 IsCollectibleSnapWindow(hwnd) {
     static scriptPid := DllCall("GetCurrentProcessId")
@@ -674,6 +731,19 @@ WindowCenterInsideRect(hwnd, rect) {
     cx := x + (w / 2)
     cy := y + (h / 2)
     return (cx >= rect.L && cx <= rect.R && cy >= rect.T && cy <= rect.B)
+}
+
+; Liefert die Schnittflaeche zweier Rechtecke in Pixeln.
+RectIntersectionArea(a, b) {
+    L := Max(a.L, b.L)
+    T := Max(a.T, b.T)
+    R := Min(a.R, b.R)
+    B := Min(a.B, b.B)
+    w := R - L
+    h := B - T
+    if (w <= 0 || h <= 0)
+        return 0
+    return w * h
 }
 
 ; Speichert die letzte Navigationsrichtung fuer das Fenster.
