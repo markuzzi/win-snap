@@ -616,12 +616,27 @@ WP_OnPillContextMenu(targetHwnd) {
     m.Add()
     m.Add("Fenster aktivieren", (*) => WP_OnPillClick(targetHwnd))
     m.Add("Info: " . label, (*) => 0)
+    m.Add("Close", (*) => WP_CloseWindowOrApplication(targetHwnd))
     m.Disable("Info: " . label)
     try {
         m.Show()
     }
     catch Error as e {
         LogException(e, "WP_OnPillContextMenu: menu.Show failed")
+    }
+}
+
+WP_CloseWindowOrApplication(hwnd) {
+    if (!hwnd)
+        return
+    if (!DllCall("IsWindow", "ptr", hwnd) || !WinExist("ahk_id " hwnd))
+        return
+    try {
+        WinClose("ahk_id " hwnd)
+        LogInfo(Format("WP_CloseWindowOrApplication: sent WinClose to hwnd={}", hwnd))
+    }
+    catch Error as e {
+        LogException(e, "WP_CloseWindowOrApplication: WinClose failed")
     }
 }
 
