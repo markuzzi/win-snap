@@ -27,10 +27,20 @@ BuildWindowCandidateList() {
     arr := []
     ids := WinGetList()
     exclusion := WindowSearch.gui ? WindowSearch.gui.Hwnd : 0
+    scriptHwnd := A_ScriptHwnd
+    scriptPid := DllCall("GetCurrentProcessId", "UInt")
     for hwnd in ids {
         if (hwnd = exclusion)
             continue
+        if (hwnd = scriptHwnd)
+            continue
         if (!DllCall("IsWindow", "ptr", hwnd) || !WinExist("ahk_id " hwnd))
+            continue
+        hwndPid := 0
+        try {
+            hwndPid := WinGetPID("ahk_id " hwnd)
+        }
+        if (scriptPid && hwndPid = scriptPid)
             continue
         title := Trim(WinGetTitle("ahk_id " hwnd))
         className := ""
