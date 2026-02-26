@@ -250,10 +250,16 @@ WP_CreatePill(x, y, text, isActive, targetHwnd := 0) {
         global WindowPills
         if (targetHwnd)
             WindowPills.guiToHwnd[g.Hwnd] := targetHwnd
+        if (IsObject(g))
+            g.OnEvent("ContextMenu", (*) => WP_OnPillContextMenu(targetHwnd))
         if (IsObject(ctrl))
             ctrl.OnEvent("Click", (*) => WP_OnPillClick(targetHwnd))
+        if (IsObject(ctrl))
+            ctrl.OnEvent("ContextMenu", (*) => WP_OnPillContextMenu(targetHwnd))
         if (IsObject(pic))
             pic.OnEvent("Click", (*) => WP_OnPillClick(targetHwnd))
+        if (IsObject(pic))
+            pic.OnEvent("ContextMenu", (*) => WP_OnPillContextMenu(targetHwnd))
     }
     catch Error as e {
         LogException(e, "WindowPills: event hookup failed")
@@ -574,6 +580,113 @@ WP_OnPillClick(targetHwnd) {
     catch Error as e {
         LogException(e, "WP_OnPillClick: failed")
     }
+}
+
+WP_OnPillContextMenu(targetHwnd) {
+    global WindowPills
+    if (!targetHwnd)
+        return
+    now := A_TickCount
+    lastTick := (IsObject(WindowPills) && WindowPills.HasOwnProp("ctxTick")) ? WindowPills.ctxTick : 0
+    lastHwnd := (IsObject(WindowPills) && WindowPills.HasOwnProp("ctxHwnd")) ? WindowPills.ctxHwnd : 0
+    if (targetHwnd = lastHwnd && (now - lastTick) < 200)
+        return
+    if (IsObject(WindowPills)) {
+        WindowPills.ctxTick := now
+        WindowPills.ctxHwnd := targetHwnd
+    }
+    info := WP_GetWindowIdentity(targetHwnd)
+    if (!info)
+        return
+    label := info.exe
+    if (info.className)
+        label := label . " (" . info.className . ")"
+
+    m := Menu()
+    isBlack := IsBlacklistedExe(info.exe, info.className)
+    if (isBlack) {
+        m.Add("Aus AutoSnap-Blacklist entfernen", (*) => WP_RemoveWindowFromBlacklist(targetHwnd))
+        m.Add("Zu AutoSnap-Blacklist hinzufuegen", (*) => 0)
+        m.Disable("Zu AutoSnap-Blacklist hinzufuegen")
+    } else {
+        m.Add("Zu AutoSnap-Blacklist hinzufuegen", (*) => WP_AddWindowToBlacklist(targetHwnd))
+        m.Add("Aus AutoSnap-Blacklist entfernen", (*) => 0)
+        m.Disable("Aus AutoSnap-Blacklist entfernen")
+    }
+    m.Add()
+    m.Add("Fenster aktivieren", (*) => WP_OnPillClick(targetHwnd))
+    m.Add("Info: " . label, (*) => 0)
+    m.Disable("Info: " . label)
+    try {
+        m.Show()
+    }
+    catch Error as e {
+        LogException(e, "WP_OnPillContextMenu: menu.Show failed")
+    }
+}
+
+WP_GetWindowIdentity(hwnd) {
+    if (!hwnd)
+        return 0
+    if (!DllCall("IsWindow", "ptr", hwnd) || !WinExist("ahk_id " hwnd))
+        return 0
+    try {
+        exe := WinGetProcessName("ahk_id " hwnd)
+    } catch {
+        exe := ""
+    }
+    try {
+        className := WinGetClass("ahk_id " hwnd)
+    } catch {
+        className := ""
+    }
+    if (!exe || !className)
+        return 0
+    return { exe:exe, className:className }
+}
+
+WP_AddWindowToBlacklist(hwnd) {
+    global AutoSnapBlackList
+    info := WP_GetWindowIdentity(hwnd)
+    if (!info)
+        return
+    if (!IsSet(AutoSnapBlackList) || !(AutoSnapBlackList is Map))
+        AutoSnapBlackList := Map()
+    comboKey := "exe:" . StrLower(info.exe) . "|class:" . info.className
+    if (AutoSnapBlackList.Has(comboKey)) {
+        ShowTrayTip("Bereits auf AutoSnap-Blacklist: " . info.exe . " (" . info.className . ")", 1500)
+        return
+    }
+    AutoSnapBlackList[comboKey] := true
+    try BlackList_Save()
+    ShowTrayTip("AutoSnap Blacklist hinzugefuegt: " . info.exe . " (" . info.className . ")", 1500)
+    LogInfo(Format("WP_AddWindowToBlacklist: added exe={}, class={}", info.exe, info.className))
+}
+
+WP_RemoveWindowFromBlacklist(hwnd) {
+    global AutoSnapBlackList
+    info := WP_GetWindowIdentity(hwnd)
+    if (!info)
+        return
+    if (!IsSet(AutoSnapBlackList) || !(AutoSnapBlackList is Map))
+        AutoSnapBlackList := Map()
+    exeKey := "exe:" . StrLower(info.exe)
+    classKey := "class:" . info.className
+    comboKey := exeKey . "|" . classKey
+    changed := false
+    if (AutoSnapBlackList.Has(comboKey))
+        AutoSnapBlackList.Delete(comboKey), changed := true
+    if (AutoSnapBlackList.Has(exeKey))
+        AutoSnapBlackList.Delete(exeKey), changed := true
+    if (AutoSnapBlackList.Has(classKey))
+        AutoSnapBlackList.Delete(classKey), changed := true
+    if (!changed) {
+        ShowTrayTip("Nicht auf AutoSnap-Blacklist: " . info.exe . " (" . info.className . ")", 1500)
+        return
+    }
+    try BlackList_Save()
+    ShowTrayTip("AutoSnap Blacklist entfernt: " . info.exe . " (" . info.className . ")", 1500)
+    LogInfo(Format("WP_RemoveWindowFromBlacklist: removed exe={}, class={}", info.exe, info.className))
 }
 
 WP_RefreshActiveStyles() {

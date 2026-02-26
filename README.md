@@ -9,7 +9,7 @@ The script organizes each monitor into “leaves” (snap areas) that you can sp
 - Grid/snapping per monitor with adjustable splits
 - Keyboard navigation and expand/shrink across neighbors
 - Layout presets (e.g., 50/50, 2x2, 70/30)
-- Highlight overlay for current snap area and optional window pills overlay
+- Highlight overlay for current snap area and optional window pills overlay (left-click activate, right-click blacklist)
 - Window search within the active snap area
 - Drag-move and drag-resize using Alt mouse gestures
 - Quick transparency controls for the active window
