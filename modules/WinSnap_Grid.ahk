@@ -499,6 +499,14 @@ CycleWindowInLeaf(direction) {
         global SuppressActivationReorder
         SuppressActivationReorder := true
         WinActivate "ahk_id " target
+        try {
+            ; Force a fast pills refresh so active-border follows cycle immediately.
+            WindowPills_Invalidate()
+            SetTimer(WindowPills_Invalidate, -120)
+        }
+        catch Error as e {
+            LogException(e, "CycleWindowInLeaf: WindowPills_Invalidate failed")
+        }
         ; Nach kurzer Zeit wieder freigeben (Ticker fuer Highlight laeuft alle ~150ms)
         try {
             SetTimer(ClearCycleReorderSuppression, -250)
