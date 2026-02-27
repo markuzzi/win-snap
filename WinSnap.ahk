@@ -16,7 +16,7 @@ global MinFrac       := 0.15
 global MaxFrac       := 0.85
 global SnapGap       := 24        ; Abstand zwischen Snap-Areas (Pixel gesamt)
 
-global HighlightEnabled := true    ; roten Rahmen anzeigen?
+global HighlightEnabled := false    ; highlight Rahmen anzeigen?
 global BorderPx         := 3
 
 ; =========================
@@ -77,6 +77,8 @@ global WindowPillsTextColor := "cBlack"
 global WindowPillsActiveTextColor := "cWhite"
 global WindowPillColor := "Silver"
 global WindowPillColorActive := "Gray"
+global WindowPillsActiveBorderColor := "Teal"
+global WindowPillsActiveBorderPx := 3
 global WindowPillsShowIcons := true    ; Icons in Pills anzeigen
 global WindowPillsIconSize := 16       ; Icon-Größe (px)
 global WindowPillsIconGap := 6         ; Abstand Icon↔Text

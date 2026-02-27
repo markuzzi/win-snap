@@ -8,14 +8,16 @@
 ; area. The current window appears with a darker color.
 
 ; Track last rebuild time to rate‑limit updates
-WindowPills := { pills: [], shown:false, lastSig:"", guiToHwnd: Map(), hooks:false, lastRebuild:0 }
+WindowPills := { pills: [], shown:false, lastSig:"", guiToHwnd: Map(), hooks:false, lastRebuild:0, borderGui:0 }
 
 WindowPills_Init() {
     global WindowPills
     if (!IsObject(WindowPills))
-        WindowPills := { pills: [], shown:false, lastSig:"", guiToHwnd: Map(), hooks:false }
+        WindowPills := { pills: [], shown:false, lastSig:"", guiToHwnd: Map(), hooks:false, borderGui:0 }
     if (!WindowPills.HasOwnProp("guiToHwnd") || !(WindowPills.guiToHwnd is Map))
         WindowPills.guiToHwnd := Map()
+    if (!WindowPills.HasOwnProp("borderGui"))
+        WindowPills.borderGui := 0
     if (!WindowPills.hooks) {
         try {
             OnMessage(0x0201, WP_OnMouse) ; WM_LBUTTONDOWN
@@ -45,6 +47,7 @@ WindowPills_Clear() {
     }
     WindowPills.pills := []
     WindowPills.shown := false
+    WP_HideActivePillBorder()
     ; Keep WindowPillsReserve to avoid unnecessary window reapply flicker
     try {
         WindowPills.guiToHwnd := Map()
@@ -498,6 +501,7 @@ WindowPills_Update() {
     }
 
     WindowPills.shown := (WindowPills.pills.Length > 0)
+    WP_RefreshActiveStyles()
     ; Destroy old after new are shown (double buffering)
     for g in oldPills {
         try {
@@ -530,6 +534,75 @@ WP_SetPillRegion(gui, w, h) {
     }
     catch Error as e {
         LogException(e, "WP_SetPillRegion: failed to set region")
+    }
+}
+
+WP_SetRingRegion(gui, w, h, radius, borderPx) {
+    try {
+        outerRgn := DllCall("CreateRoundRectRgn", "Int", 0, "Int", 0, "Int", w, "Int", h, "Int", radius, "Int", radius, "Ptr")
+        innerRadius := Max(2, radius - borderPx)
+        innerRgn := DllCall("CreateRoundRectRgn", "Int", borderPx, "Int", borderPx, "Int", w - borderPx, "Int", h - borderPx, "Int", innerRadius, "Int", innerRadius, "Ptr")
+        ringRgn := DllCall("CreateRectRgn", "Int", 0, "Int", 0, "Int", 0, "Int", 0, "Ptr")
+        DllCall("CombineRgn", "Ptr", ringRgn, "Ptr", outerRgn, "Ptr", innerRgn, "Int", 4) ; RGN_DIFF
+        DllCall("SetWindowRgn", "Ptr", gui.Hwnd, "Ptr", ringRgn, "Int", true)
+        DllCall("DeleteObject", "Ptr", outerRgn)
+        DllCall("DeleteObject", "Ptr", innerRgn)
+    }
+    catch Error as e {
+        LogException(e, "WP_SetRingRegion: failed")
+    }
+}
+
+WP_EnsureActivePillBorderGui() {
+    global WindowPills, WindowPillsActiveBorderColor
+    try {
+        if (IsObject(WindowPills.borderGui))
+            return WindowPills.borderGui
+        ; Layered + no-activate + click-through
+        style := "+AlwaysOnTop -Caption +ToolWindow +E0x08080020 -DPIScale"
+        g := Gui(style)
+        g.BackColor := WindowPillsActiveBorderColor
+        try WinSetTransparent(255, g)
+        WindowPills.borderGui := g
+        return g
+    }
+    catch Error as e {
+        LogException(e, "WP_EnsureActivePillBorderGui: failed")
+        return 0
+    }
+}
+
+WP_HideActivePillBorder() {
+    global WindowPills
+    try {
+        if (IsObject(WindowPills.borderGui))
+            WindowPills.borderGui.Hide()
+    }
+    catch Error as e {
+        LogException(e, "WP_HideActivePillBorder: failed")
+    }
+}
+
+WP_ShowActivePillBorder(pillGui) {
+    global WindowPillsActiveBorderPx, WindowPillsRadius
+    if (!IsObject(pillGui))
+        return
+    g := WP_EnsureActivePillBorderGui()
+    if (!IsObject(g))
+        return
+    try {
+        WinGetPos(&x, &y, &w, &h, "ahk_id " pillGui.Hwnd)
+        b := Max(1, WindowPillsActiveBorderPx)
+        bx := x - b
+        by := y - b
+        bw := w + (2 * b)
+        bh := h + (2 * b)
+        g.Move(Round(bx), Round(by), Round(bw), Round(bh))
+        WP_SetRingRegion(g, bw, bh, WindowPillsRadius +10 + b, b)
+        g.Show("NA")
+    }
+    catch Error as e {
+        LogException(e, "WP_ShowActivePillBorder: failed")
     }
 }
 
@@ -706,9 +779,11 @@ WP_RemoveWindowFromBlacklist(hwnd) {
 
 WP_RefreshActiveStyles() {
     try {
-        global WindowPills, WinToLeaf
-        if (!IsObject(WindowPills) || !WindowPills.pills.Length)
+        global WindowPills, WinToLeaf, CurrentHighlight
+        if (!IsObject(WindowPills) || !WindowPills.pills.Length) {
+            WP_HideActivePillBorder()
             return
+        }
         ; Build active per leaf
         activeMap := Map() ; key mon:leaf -> hwnd
         try {
@@ -726,7 +801,21 @@ WP_RefreshActiveStyles() {
             st := WinToLeaf[sysActive]
             activeMap[st.mon ":" st.leaf] := sysActive
         }
+        ; Determine the currently active SnapArea (prefer focused window's monitor/selection)
+        activeAreaMon := 0
+        activeAreaLeaf := 0
+        if (sysActive && WinToLeaf.Has(sysActive)) {
+            ai := WinToLeaf[sysActive]
+            activeAreaMon := ai.mon
+            selected := GetSelectedLeaf(ai.mon)
+            activeAreaLeaf := selected ? selected : ai.leaf
+        } else if (CurrentHighlight.mon && CurrentHighlight.leaf) {
+            activeAreaMon := CurrentHighlight.mon
+            activeAreaLeaf := CurrentHighlight.leaf
+        }
+
         ; Update each pill's appearance
+        borderShown := false
         for g in WindowPills.pills {
             guiHwnd := g.Hwnd
             if (!WindowPills.guiToHwnd.Has(guiHwnd))
@@ -737,8 +826,15 @@ WP_RefreshActiveStyles() {
             info := WinToLeaf[target]
             key := info.mon ":" info.leaf
             isActive := (activeMap.Has(key) && activeMap[key] = target)
+            isInActiveArea := (activeAreaMon = info.mon && activeAreaLeaf = info.leaf)
             WP_SetPillAppearance(g, isActive)
+            if (isActive && isInActiveArea && !borderShown) {
+                WP_ShowActivePillBorder(g)
+                borderShown := true
+            }
         }
+        if (!borderShown)
+            WP_HideActivePillBorder()
     }
     catch Error as e {
         LogException(e, "WP_RefreshActiveStyles: failed")
