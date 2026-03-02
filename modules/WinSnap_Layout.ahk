@@ -596,8 +596,28 @@ SaveLeafAssignment(mon, leafId, hwnd) {
     global Layouts
     Layout_Ensure(mon)
 
-    exe := WinGetProcessName("ahk_id " hwnd)
-    title := WinGetTitle("ahk_id " hwnd)
+    if (!hwnd)
+        return
+    try {
+        if (!DllCall("IsWindow", "ptr", hwnd) || !WinExist("ahk_id " hwnd))
+            return
+    }
+    catch Error as e {
+        return
+    }
+
+    try {
+        exe := WinGetProcessName("ahk_id " hwnd)
+    }
+    catch Error as e {
+        return
+    }
+    try {
+        title := WinGetTitle("ahk_id " hwnd)
+    }
+    catch Error as e {
+        return
+    }
     if (!exe || !title)
         return
 
@@ -636,10 +656,10 @@ AutoSnap_AssignedWindows() {
 
             try {
                 ; Nach Fenster suchen, das zu exe UND title passt
-                WinGetList &list
+                list := WinGetList()
                 for hwnd in list {
-                    WinGetProcessName &winExe, "ahk_id " hwnd
-                    WinGetTitle &winTitle, "ahk_id " hwnd
+                    winExe := WinGetProcessName("ahk_id " hwnd)
+                    winTitle := WinGetTitle("ahk_id " hwnd)
 
                     if (winExe = entry.exe && winTitle = entry.title) {
                         r := GetLeafRect(mon, entry.leaf)

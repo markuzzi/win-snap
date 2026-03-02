@@ -76,7 +76,14 @@ SnappedWindows_WriteStatus() {
             catch {
                 title := ""
             }
-            data.Push({ hwnd:hwnd, process:exe, class:className, title:title, mon:info.mon, leaf:info.leaf })
+            row := Map()
+            row["hwnd"] := hwnd
+            row["process"] := exe
+            row["class"] := className
+            row["title"] := title
+            row["mon"] := info.mon
+            row["leaf"] := info.leaf
+            data.Push(row)
         }
         f := FileOpen(SnappedWindowsStatusPath, "w", "UTF-8")
         if (f) {

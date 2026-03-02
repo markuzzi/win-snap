@@ -31,9 +31,6 @@ WindowPills_Init() {
             WindowPills.hooks := true
         }
         catch Error as e {
-            LogError("WindowPills_Update: reserve update block failed")
-        }
-        catch Error as e {
             LogError("WindowPills_Init: OnMessage hook failed")
         }
     }
@@ -128,7 +125,6 @@ WP_BuildStateSignature() {
     }
     catch Error as e {
         focused := 0
-        LogError("WindowPills: WinGetID failed for signature")
     }
     sig.Push("E:" (WindowPillsEnabled ? 1 : 0))
     sig.Push("M:" (IsSet(WindowPillsMaxTitle) ? WindowPillsMaxTitle : 20))
@@ -221,7 +217,7 @@ WP_CreatePill(x, y, text, isActive, targetHwnd := 0) {
             }
         }
         catch Error as e {
-            LogError("WindowPills: AddPicture (icon) failed")
+            LogDebug("WindowPills: AddPicture (icon) failed")
         }
     }
     ctrl := g.AddText("x+0 ym +0x0100 BackgroundTrans", text) ; +SS_NOTIFY for click
