@@ -25,6 +25,7 @@ global BorderPx         := 3
 global WinHistory  := Map()       ; hwnd -> {x,y,w,h}
 global LastDir     := Map()       ; hwnd -> "left"|"right"|"top"|"bottom"|"up"
 global WinToLeaf   := Map()       ; hwnd -> {mon: idx, leaf: id}
+global MaximizeRestoreState := Map() ; hwnd -> {snapped:bool, mon:idx, leaf:id}
 global LeafWindows := Map()       ; (mon:leaf) -> [hwnd,...]
 global AutoSnapBlackList := Map() ; exe (lowercase) -> true
 global ShellHookMsg := 0          ; Message-ID f�r SHELLHOOK
@@ -158,30 +159,84 @@ Esc:: {
 #^Up::   GridMove("up")
 #^Down:: GridMove("down")
 
-; Win+Shift+Up: Fullscreen (erneut: UnSnap)
+; Win+Shift+Up: maximieren + Pills hinter das Fenster legen
 #+Up:: {
+    global MaximizeRestoreState, WinToLeaf
     win := GetActiveWindow()
     if (!win)
         return
     hwnd := win.hwnd
-    if (LastDir.Has(hwnd) && (LastDir[hwnd] = "up"))
-        UnSnapWindow(hwnd)
-    else {
-        mon := GetMonitorIndexAndArea(hwnd)
-        EnsureHistory(hwnd)
-        MoveWindow(hwnd, mon.left, mon.top, mon.right - mon.left, mon.bottom - mon.top)
-        LastDir[hwnd] := "up"
+
+    snapped := false
+    mon := 0
+    leaf := 0
+    if (WinToLeaf.Has(hwnd)) {
+        info := WinToLeaf[hwnd]
+        snapped := true
+        mon := info.mon
+        leaf := info.leaf
+    }
+    MaximizeRestoreState[hwnd] := { snapped:snapped, mon:mon, leaf:leaf }
+
+    try {
+        WindowPills_SendBehindWindow(hwnd)
+    }
+    catch Error as e {
+        LogException(e, "Hotkey #+Up: WindowPills_SendBehindWindow failed")
+    }
+
+    try {
+        WinMaximize "ahk_id " hwnd
+    }
+    catch Error as e {
+        ; Fallback fuer Fenster/Apps, die WinMaximize ignorieren.
+        monInfo := GetMonitorIndexAndArea(hwnd)
+        MoveWindow(hwnd, monInfo.left, monInfo.top, monInfo.right - monInfo.left, monInfo.bottom - monInfo.top)
     }
 }
 
-; Win+Shift+Down: minimieren
+; Win+Shift+Down: restore; bei gesnappten Fenstern zur alten Snap-Area zurueck
 #+Down:: {
+    global MaximizeRestoreState
     win := GetActiveWindow()
     if (!win)
         return
     hwnd := win.hwnd
-    HideHighlight()
-    WinMinimize "ahk_id " hwnd
+    restoredToLeaf := false
+
+    if (MaximizeRestoreState.Has(hwnd)) {
+        st := MaximizeRestoreState[hwnd]
+        if (st.snapped && st.mon && st.leaf) {
+            try {
+                Layout_Ensure(st.mon)
+                if (Layout_Node(st.mon, st.leaf)) {
+                    SnapToLeaf(hwnd, st.mon, st.leaf)
+                    restoredToLeaf := true
+                }
+            }
+            catch Error as e {
+                LogException(e, "Hotkey #+Down: SnapToLeaf restore failed")
+            }
+        }
+        MaximizeRestoreState.Delete(hwnd)
+    }
+
+    if (!restoredToLeaf) {
+        try {
+            if (WinGetMinMax("ahk_id " hwnd) = 1)
+                WinRestore "ahk_id " hwnd
+        }
+        catch Error as e {
+            LogException(e, "Hotkey #+Down: WinRestore failed")
+        }
+    }
+
+    try {
+        WindowPills_BringToFront()
+    }
+    catch Error as e {
+        LogException(e, "Hotkey #+Down: WindowPills_BringToFront failed")
+    }
 }
 
 ; Win+Shift+Right: Fenster auf rechte Nachbar-Area erweitern

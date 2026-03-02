@@ -8,16 +8,22 @@
 ; area. The current window appears with a darker color.
 
 ; Track last rebuild time to rate‑limit updates
-WindowPills := { pills: [], shown:false, lastSig:"", guiToHwnd: Map(), hooks:false, lastRebuild:0, borderGui:0 }
+WindowPills := { pills: [], shown:false, lastSig:"", guiToHwnd: Map(), hooks:false, lastRebuild:0, borderGui:0, zMode:"front", zTarget:0, zApplied:Map() }
 
 WindowPills_Init() {
     global WindowPills
     if (!IsObject(WindowPills))
-        WindowPills := { pills: [], shown:false, lastSig:"", guiToHwnd: Map(), hooks:false, borderGui:0 }
+        WindowPills := { pills: [], shown:false, lastSig:"", guiToHwnd: Map(), hooks:false, borderGui:0, zMode:"front", zTarget:0, zApplied:Map() }
     if (!WindowPills.HasOwnProp("guiToHwnd") || !(WindowPills.guiToHwnd is Map))
         WindowPills.guiToHwnd := Map()
     if (!WindowPills.HasOwnProp("borderGui"))
         WindowPills.borderGui := 0
+    if (!WindowPills.HasOwnProp("zMode"))
+        WindowPills.zMode := "front"
+    if (!WindowPills.HasOwnProp("zTarget"))
+        WindowPills.zTarget := 0
+    if (!WindowPills.HasOwnProp("zApplied") || !(WindowPills.zApplied is Map))
+        WindowPills.zApplied := Map()
     if (!WindowPills.hooks) {
         try {
             OnMessage(0x0201, WP_OnMouse) ; WM_LBUTTONDOWN
@@ -51,6 +57,7 @@ WindowPills_Clear() {
     ; Keep WindowPillsReserve to avoid unnecessary window reapply flicker
     try {
         WindowPills.guiToHwnd := Map()
+        WindowPills.zApplied := Map()
     }
     catch Error as e {
         LogException(e, "WindowPills_Clear: reset guiToHwnd failed")
@@ -782,6 +789,7 @@ WP_RefreshActiveStyles() {
         global WindowPills, WinToLeaf, CurrentHighlight
         if (!IsObject(WindowPills) || !WindowPills.pills.Length) {
             WP_HideActivePillBorder()
+            WP_ApplyZOrderMode()
             return
         }
         ; Build active per leaf
@@ -835,9 +843,104 @@ WP_RefreshActiveStyles() {
         }
         if (!borderShown)
             WP_HideActivePillBorder()
+        WP_ApplyZOrderMode()
     }
     catch Error as e {
         LogException(e, "WP_RefreshActiveStyles: failed")
+    }
+}
+
+; Schiebt alle Pills hinter ein Ziel-Fenster (fuer Maximize/Restore-Flow).
+WindowPills_SendBehindWindow(targetHwnd) {
+    global WindowPills
+    WindowPills_Init()
+    if (!targetHwnd)
+        return
+    if (!DllCall("IsWindow", "ptr", targetHwnd) || !WinExist("ahk_id " targetHwnd))
+        return
+    WindowPills.zMode := "behind"
+    WindowPills.zTarget := targetHwnd
+    WP_ApplyZOrderMode()
+}
+
+; Stellt die uebliche Topmost-zOrder fuer Pills wieder her.
+WindowPills_BringToFront() {
+    global WindowPills
+    WindowPills_Init()
+    WindowPills.zMode := "front"
+    WindowPills.zTarget := 0
+    WP_ApplyZOrderMode()
+}
+
+WP_ApplyZOrderMode() {
+    global WindowPills
+    WindowPills_Init()
+    mode := WindowPills.zMode
+    target := WindowPills.zTarget
+
+    if (mode = "behind") {
+        if (!target || !DllCall("IsWindow", "ptr", target) || !WinExist("ahk_id " target)) {
+            mode := "front"
+            target := 0
+            WindowPills.zMode := mode
+            WindowPills.zTarget := target
+        }
+    }
+
+    ; Clean up stale z-order cache entries for destroyed GUIs.
+    valid := Map()
+    for g in WindowPills.pills {
+        valid[g.Hwnd] := true
+        WP_ApplyGuiZOrder(g, mode, target)
+    }
+    if (IsObject(WindowPills.borderGui))
+        valid[WindowPills.borderGui.Hwnd] := true
+    staleKeys := []
+    for k in WindowPills.zApplied {
+        if (!valid.Has(k))
+            staleKeys.Push(k)
+    }
+    for k in staleKeys
+        WindowPills.zApplied.Delete(k)
+
+    if (IsObject(WindowPills.borderGui))
+        WP_ApplyGuiZOrder(WindowPills.borderGui, mode, target)
+}
+
+WP_ApplyGuiZOrder(guiObj, mode := "front", targetHwnd := 0) {
+    global WindowPills
+    if (!IsObject(guiObj))
+        return
+    ghwnd := guiObj.Hwnd
+    if (!ghwnd)
+        return
+    if (!DllCall("IsWindow", "ptr", ghwnd) || !WinExist("ahk_id " ghwnd))
+        return
+
+    SWP_NOSIZE := 0x0001
+    SWP_NOMOVE := 0x0002
+    SWP_NOACTIVATE := 0x0010
+    SWP_NOOWNERZORDER := 0x0200
+    flags := SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE | SWP_NOOWNERZORDER
+
+    cacheKey := mode ":" targetHwnd
+    if (WindowPills.zApplied.Has(ghwnd) && WindowPills.zApplied[ghwnd] = cacheKey)
+        return
+
+    try {
+        if (mode = "behind" && targetHwnd) {
+            WinSetAlwaysOnTop(0, "ahk_id " ghwnd)
+            DllCall("SetWindowPos", "ptr", ghwnd, "ptr", targetHwnd, "int", 0, "int", 0, "int", 0, "int", 0, "uint", flags)
+        } else {
+            WinSetAlwaysOnTop(1, "ahk_id " ghwnd)
+            DllCall("SetWindowPos", "ptr", ghwnd, "ptr", -1, "int", 0, "int", 0, "int", 0, "int", 0, "uint", flags)
+        }
+        WindowPills.zApplied[ghwnd] := cacheKey
+    }
+    catch Error as e {
+        if (WindowPills.zApplied.Has(ghwnd))
+            WindowPills.zApplied.Delete(ghwnd)
+        LogException(e, "WP_ApplyGuiZOrder: failed")
     }
 }
 

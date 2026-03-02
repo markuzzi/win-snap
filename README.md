@@ -35,8 +35,8 @@ Legend: `#` = Win, `!` = Alt, `^` = Ctrl, `+` = Shift
 
 - `#Left` / `#Right` / `#Up` / `#Down`: Move active window through the grid
 - `#^Up` / `#^Down`: Alternate vertical move
-- `#+Up`: Toggle fullscreen (press again to unsnap)
-- `#+Down`: Minimize active window
+- `#+Up`: Maximize active window and place window pills behind it
+- `#+Down`: Restore active window (if previously snapped, return it to its previous snap area)
 - `#+Right` / `#+Left`: Expand across right/left neighbor (and reduce back)
 - `#^+Up` / `#^+Down`: Expand across up/down neighbor
 - `!Left` / `!Right` / `!Up` / `!Down`: Switch active snap area (focus top window)
