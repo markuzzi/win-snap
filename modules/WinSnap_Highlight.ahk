@@ -52,7 +52,7 @@ ShowHighlightRect(rect) {
 
 ; Blendet das Highlight aus und setzt den aktuellen Zustand zurueck.
 HideHighlight() {
-    global HL, CurrentHighlight
+    global HL, CurrentHighlight, AppState
     if (HL.init) {
         try {
             HL.gui.Hide()
@@ -61,14 +61,22 @@ HideHighlight() {
             LogError("HideHighlight: gui.Hide failed")
         }
     }
-    CurrentHighlight := {mon:0, leaf:0}
+    if (!IsObject(CurrentHighlight)) {
+        CurrentHighlight := {mon:0, leaf:0}
+        try {
+            if (IsObject(AppState))
+                AppState.CurrentHighlight := CurrentHighlight
+        }
+    }
+    CurrentHighlight.mon := 0
+    CurrentHighlight.leaf := 0
     LogDebug("HideHighlight: hidden")
 }
 
 
 ; Zeigt das Highlight fuer die angegebene Leaf-Area (oder entfernt es).
 ApplyLeafHighlight(mon, leafId) {
-    global HighlightEnabled, CurrentHighlight, Layouts, CurrentLeafSelection
+    global HighlightEnabled, CurrentHighlight, Layouts, CurrentLeafSelection, AppState
     if (!HighlightEnabled) {
         HideHighlight()
         return
@@ -86,7 +94,15 @@ ApplyLeafHighlight(mon, leafId) {
     }
     rect := ToPixelRect(mon, GetLeafRect(mon, leafId))
     ShowHighlightRect(rect)
-    CurrentHighlight := {mon:mon, leaf:leafId}
+    if (!IsObject(CurrentHighlight)) {
+        CurrentHighlight := {mon:0, leaf:0}
+        try {
+            if (IsObject(AppState))
+                AppState.CurrentHighlight := CurrentHighlight
+        }
+    }
+    CurrentHighlight.mon := mon
+    CurrentHighlight.leaf := leafId
     LogTrace(Format("ApplyLeafHighlight: mon={}, leaf={}", mon, leafId))
 }
 

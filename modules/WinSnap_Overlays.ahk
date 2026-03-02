@@ -4,9 +4,17 @@
 
 ; Stellt sicher, dass die Overlay-Datenstruktur initialisiert ist.
 OverlayEnsure() {
-    global SnapOverlay
-    if (!IsObject(SnapOverlay))
-        SnapOverlay := {}
+    global SnapOverlay, AppState
+    if (!IsObject(SnapOverlay)) {
+        SnapOverlay := {edges:[]}
+        try {
+            if (IsObject(AppState))
+                AppState.SnapOverlay := SnapOverlay
+        }
+        catch Error as e {
+            ; keep local fallback
+        }
+    }
     if (!SnapOverlay.HasOwnProp("edges"))
         SnapOverlay.edges := []
 }

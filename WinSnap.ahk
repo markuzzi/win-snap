@@ -22,37 +22,58 @@ global BorderPx         := 3
 ; =========================
 ; Globale States
 ; =========================
-global WinHistory  := Map()       ; hwnd -> {x,y,w,h}
-global LastDir     := Map()       ; hwnd -> "left"|"right"|"top"|"bottom"|"up"
-global WinToLeaf   := Map()       ; hwnd -> {mon: idx, leaf: id}
-global MaximizeRestoreState := Map() ; hwnd -> {snapped:bool, mon:idx, leaf:id}
-global LeafWindows := Map()       ; (mon:leaf) -> [hwnd,...]
-global AutoSnapBlackList := Map() ; exe (lowercase) -> true
-global ShellHookMsg := 0          ; Message-ID f�r SHELLHOOK
-global AutoSnapBlackList := Map() ; exe -> true (vom AutoSnap ausgenommen)
+global AppState := {
+    WinHistory: Map(),            ; hwnd -> {x,y,w,h}
+    LastDir: Map(),               ; hwnd -> "left"|"right"|"top"|"bottom"|"up"
+    WinToLeaf: Map(),             ; hwnd -> {mon: idx, leaf: id}
+    MaximizeRestoreState: Map(),  ; hwnd -> {snapped:bool, mon:idx, leaf:id}
+    LeafWindows: Map(),           ; (mon:leaf) -> [hwnd,...]
+    AutoSnapBlackList: Map(),     ; exe/class -> true
+    ; Layout pro Monitor:
+    ; Layouts[mon] = { root: id, next: id, nodes: Map() }
+    ; Node: {id, parent, split: ""|"v"|"h", frac: float, a: id, b: id}
+    Layouts: Map(),
+    ; Highlight-GUIs (vier Ränder)
+    HL: {init:false, top:"", bot:"", left:"", right:""},
+    CurrentHighlight: {mon:0, leaf:0},
+    CurrentLeafSelection: Map(),  ; mon -> {leaf, source:"manual"|"auto"}
+    ManualNav: {mon:0, leaf:0},
+    SnapOverlay: {edges:[]},
+    WindowSearch: {gui:"", edit:"", list:"", items:[], filtered:[], ctx:{}, active:false},
+    FrameComp: Map(),             ; Klassenname -> {L,T,R,B} Offsets fuer EFB-Kompensation
+    EfbSkip: { classes: Map(), processes: Map() },      ; EFB-Korrektur komplett ueberspringen
+    EfbShrinkOnly: { classes: Map(), processes: Map() }, ; EFB nur schrumpfen, nicht vergroessern
+    WindowPillsReserve: Map()     ; (mon:leaf) -> reservierte Hoehe oberhalb Area
+}
 
-; Layout pro Monitor:
-; Layouts[mon] = { root: id, next: id, nodes: Map() }
-; Node: {id, parent, split: ""|"v"|"h", frac: float, a: id, b: id}
-global Layouts := Map()
+; Kompatibilitaets-Aliase: bestehender Modulcode kann weiter mit den bisherigen
+; Globalnamen arbeiten, waehrend die Struktur zentral in AppState lebt.
+global WinHistory := AppState.WinHistory
+global LastDir := AppState.LastDir
+global WinToLeaf := AppState.WinToLeaf
+global MaximizeRestoreState := AppState.MaximizeRestoreState
+global LeafWindows := AppState.LeafWindows
+global AutoSnapBlackList := AppState.AutoSnapBlackList
+global Layouts := AppState.Layouts
+global HL := AppState.HL
+global CurrentHighlight := AppState.CurrentHighlight
+global CurrentLeafSelection := AppState.CurrentLeafSelection
+global ManualNav := AppState.ManualNav
+global SnapOverlay := AppState.SnapOverlay
+global WindowSearch := AppState.WindowSearch
+global FrameComp := AppState.FrameComp
+global EfbSkip := AppState.EfbSkip
+global EfbShrinkOnly := AppState.EfbShrinkOnly
+global WindowPillsReserve := AppState.WindowPillsReserve
 
-; Highlight-GUIs (vier Ränder)
-global HL := {init:false, top:"", bot:"", left:"", right:""}
-global CurrentHighlight := {mon:0, leaf:0}
-global CurrentLeafSelection := Map()    ; mon -> {leaf, source:"manual"|"auto"}
-global ManualNav := {mon:0, leaf:0}
-global SnapOverlay := {edges:[]}
+global ShellHookMsg := 0          ; Message-ID fuer SHELLHOOK
 global OverlayDuration := 1200
 global SelectionFlashDuration := 350
 global OverlayColor := "Navy"
 global OverlayOpacity := 160
 global SelectionFlashColor := "Teal"
-global WindowSearch := {gui:"", edit:"", list:"", items:[], filtered:[], ctx:{}, active:false}
-global FrameComp := Map()    ; Klassenname -> {L,T,R,B} Offsets fr Extended Frame Bounds-Kompensation
 global FrameCompDebug := true
 global FrameCompLogPath := A_ScriptDir "\WinSnap.log"
-global EfbSkip := { classes: Map(), processes: Map() }        ; EFB-Korrektur komplett überspringen
-global EfbShrinkOnly := { classes: Map(), processes: Map() }   ; EFB nur schrumpfen, nicht vergrößern
 global ActivateOnAreaSwitch := true    ; Beim Snap-Area-Wechsel Fenster fokussieren? (false = nur Auswahl/Highlight)
 global LoggingEnabled := true          ; Logging ein/aus
 global LoggingLevel := 1               ; 0=aus, 1=INFO, 2=DEBUG, 3=TRACE
@@ -85,7 +106,6 @@ global WindowPillsActiveBorderPx := 3
 global WindowPillsShowIcons := true    ; Icons in Pills anzeigen
 global WindowPillsIconSize := 16       ; Icon-Größe (px)
 global WindowPillsIconGap := 6         ; Abstand Icon↔Text
-global WindowPillsReserve := Map()      ; (mon:leaf) -> reservierte Höhe oberhalb Area
 global WindowPillsReserveAllLeaves := true
 global WindowPillsReserveDefaultPx := (2*WindowPillsMarginY) + (2*WindowPillsPaddingY) + Ceil(WindowPillsFontSize*1.6)
 

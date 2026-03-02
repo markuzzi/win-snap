@@ -180,13 +180,30 @@ ApplyManualNavigation(ctx) {
 
 ; Setzt die manuelle Navigation auf (mon, leaf).
 ManualNav_Set(mon, leaf) {
-    global ManualNav
-    ManualNav := { mon:mon, leaf:leaf }
+    global ManualNav, AppState
+    if (!IsObject(ManualNav)) {
+        ManualNav := { mon:0, leaf:0 }
+        try {
+            if (IsObject(AppState))
+                AppState.ManualNav := ManualNav
+        }
+    }
+    ManualNav.mon := mon
+    ManualNav.leaf := leaf
 }
 
 ; Loescht die manuelle Navigation (optional nur fuer einen Monitor).
 ManualNav_Clear(mon := 0) {
-    global ManualNav
-    if (!mon || ManualNav.mon = mon)
+    global ManualNav, AppState
+    if (!IsObject(ManualNav)) {
         ManualNav := { mon:0, leaf:0 }
+        try {
+            if (IsObject(AppState))
+                AppState.ManualNav := ManualNav
+        }
+    }
+    if (!mon || ManualNav.mon = mon) {
+        ManualNav.mon := 0
+        ManualNav.leaf := 0
+    }
 }
