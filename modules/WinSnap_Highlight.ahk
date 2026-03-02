@@ -16,8 +16,8 @@ HL_Init() {
 
 ; Zeigt einen abgerundeten Rahmen um das angegebene Rechteck an.
 ShowHighlightRect(rect) {
-    global HL, BorderPx, HighlightEnabled
-    if (!HighlightEnabled)
+    global HL, BorderPx
+    if (!StateGet("HighlightEnabled", false))
         return
     HL_Init()
 
@@ -76,8 +76,8 @@ HideHighlight() {
 
 ; Zeigt das Highlight fuer die angegebene Leaf-Area (oder entfernt es).
 ApplyLeafHighlight(mon, leafId) {
-    global HighlightEnabled, CurrentHighlight, Layouts, CurrentLeafSelection, AppState
-    if (!HighlightEnabled) {
+    global CurrentHighlight, Layouts, CurrentLeafSelection, AppState
+    if (!StateGet("HighlightEnabled", false)) {
         HideHighlight()
         return
     }

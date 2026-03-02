@@ -16,7 +16,6 @@ global MinFrac       := 0.15
 global MaxFrac       := 0.85
 global SnapGap       := 24        ; Abstand zwischen Snap-Areas (Pixel gesamt)
 
-global HighlightEnabled := false    ; highlight Rahmen anzeigen?
 global BorderPx         := 3
 
 ; =========================
@@ -43,7 +42,27 @@ global AppState := {
     FrameComp: Map(),             ; Klassenname -> {L,T,R,B} Offsets fuer EFB-Kompensation
     EfbSkip: { classes: Map(), processes: Map() },      ; EFB-Korrektur komplett ueberspringen
     EfbShrinkOnly: { classes: Map(), processes: Map() }, ; EFB nur schrumpfen, nicht vergroessern
-    WindowPillsReserve: Map()     ; (mon:leaf) -> reservierte Hoehe oberhalb Area
+    WindowPillsReserve: Map(),    ; (mon:leaf) -> reservierte Hoehe oberhalb Area
+    ; Primitive State-Flags (vorher als einzelne Globals)
+    HighlightEnabled: false,
+    ShellHookMsg: 0,
+    OverlayDuration: 1200,
+    SelectionFlashDuration: 350,
+    OverlayColor: "Navy",
+    OverlayOpacity: 160,
+    SelectionFlashColor: "Teal",
+    FrameCompDebug: true,
+    FrameCompLogPath: A_ScriptDir "\WinSnap.log",
+    ActivateOnAreaSwitch: true,
+    LoggingEnabled: true,
+    LoggingLevel: 1,
+    LoggingPath: A_ScriptDir "\WinSnap.log",
+    ScriptPaused: false,
+    SnappedWindowsStatusPath: A_ScriptDir "\WinSnap_SnappedWindows.json",
+    SnappedWindowsWritePending: false,
+    LayoutSavePending: false,
+    LayoutSaveDelayMs: 500,
+    SuppressMoveHighlight: false
 }
 
 ; Kompatibilitaets-Aliase: bestehender Modulcode kann weiter mit den bisherigen
@@ -65,25 +84,6 @@ global FrameComp := AppState.FrameComp
 global EfbSkip := AppState.EfbSkip
 global EfbShrinkOnly := AppState.EfbShrinkOnly
 global WindowPillsReserve := AppState.WindowPillsReserve
-
-global ShellHookMsg := 0          ; Message-ID fuer SHELLHOOK
-global OverlayDuration := 1200
-global SelectionFlashDuration := 350
-global OverlayColor := "Navy"
-global OverlayOpacity := 160
-global SelectionFlashColor := "Teal"
-global FrameCompDebug := true
-global FrameCompLogPath := A_ScriptDir "\WinSnap.log"
-global ActivateOnAreaSwitch := true    ; Beim Snap-Area-Wechsel Fenster fokussieren? (false = nur Auswahl/Highlight)
-global LoggingEnabled := true          ; Logging ein/aus
-global LoggingLevel := 1               ; 0=aus, 1=INFO, 2=DEBUG, 3=TRACE
-global LoggingPath := FrameCompLogPath ; Pfad zur Logdatei
-global ScriptPaused := false           ; eigener Pause-Status (Hotkeys + Timer)
-global SnappedWindowsStatusPath := A_ScriptDir "\WinSnap_SnappedWindows.json" ; aktueller Snap-Status (Process/Class)
-global SnappedWindowsWritePending := false
-global LayoutSavePending := false
-global LayoutSaveDelayMs := 500
-global SuppressMoveHighlight := false  ; unterdrückt Highlight während Massen-Moves
 
 ; Window Pills Overlay (config)
 global WindowPillsEnabled := true      ; Anzeige der Fenster-Pills über SnapAreas
@@ -114,6 +114,33 @@ global WindowPillsUpdateInterval := 300       ; ms; 0 = disable periodic updates
 global WindowPillsOnDemandOnly := false       ; true = update only when layout/selection changes
 global WindowPillsMinRebuildInterval := 250   ; ms guard between full rebuilds
 global WindowPillsReserveChangeTolerance := 2  ; px; only reapply if change >= tolerance
+
+; --- AppState Helper --------------------------------------------------------
+StateGet(key, default := "") {
+    global AppState
+    try {
+        if (IsObject(AppState) && AppState.HasOwnProp(key))
+            return AppState.%key%
+    }
+    catch Error as e {
+    }
+    return default
+}
+
+StateSet(key, value) {
+    global AppState
+    if (!IsObject(AppState))
+        AppState := {}
+    AppState.%key% := value
+    return value
+}
+
+StateToggle(key, default := false) {
+    val := !!StateGet(key, default)
+    val := !val
+    StateSet(key, val)
+    return val
+}
 
 ; Drag-Snap (RButton while LButton dragging)
 ; Drag-Snap moved to module
@@ -147,7 +174,7 @@ App_Startup()
     TogglePause()
 }
 
-#HotIf !ScriptPaused && WindowSearch.active
+#HotIf !StateGet("ScriptPaused", false) && WindowSearch.active
 Up:: {
     WindowSearch_MoveSelection(-1)
     return
@@ -166,7 +193,7 @@ Esc:: {
 }
 #HotIf
 
-#HotIf !ScriptPaused
+#HotIf !StateGet("ScriptPaused", false)
 
 ; Win+Left/Right/Up/Down: durch Grid bewegen (inkl. Auto-Split beim ersten Snap)
 #Left::  GridMove("left")
@@ -318,9 +345,9 @@ Esc:: {
 
 ; Highlight toggeln
 ^!h:: {
-    global HighlightEnabled, CurrentLeafSelection
-    HighlightEnabled := !HighlightEnabled
-    if (!HighlightEnabled)
+    global CurrentLeafSelection
+    enabled := StateToggle("HighlightEnabled", false)
+    if (!enabled)
         HideHighlight()
     else {
         for mon, state in CurrentLeafSelection {

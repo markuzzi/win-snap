@@ -37,7 +37,7 @@ OverlayClear() {
 
 ; Fuegt ein abgerundetes, transparentes Rechteck-Overlay hinzu.
 OverlayAddRect(rect, color, thickness := 0) {
-    global SnapOverlay, OverlayOpacity
+    global SnapOverlay
     OverlayEnsure()
 
     ; --- Validierung ---
@@ -67,7 +67,9 @@ OverlayAddRect(rect, color, thickness := 0) {
 
     ; --- Abrundungsradius & Transparenz vorbereiten ---
     radius := 16
-    opacity := (IsSet(OverlayOpacity) && OverlayOpacity > 0) ? OverlayOpacity : 150
+    opacity := StateGet("OverlayOpacity", 160)
+    if (opacity <= 0)
+        opacity := 150
 
     try {
         ; Use pixel coordinates for overlays to avoid DPI scaling offsets
@@ -142,18 +144,18 @@ HideSnapOverlay(*) {
 
 ; Blitzt die Umrandung einer Leaf-Area kurz auf.
 FlashLeafOutline(mon, leafId, color := "", duration := 0) {
-    global SelectionFlashColor, SelectionFlashDuration
     Layout_Ensure(mon)
     r := GetLeafRectPx(mon, leafId)
-    useColor := (color != "") ? color : SelectionFlashColor
-    useDuration := (duration > 0) ? duration : SelectionFlashDuration
+    useColor := (color != "") ? color : StateGet("SelectionFlashColor", "Teal")
+    useDuration := (duration > 0) ? duration : StateGet("SelectionFlashDuration", 350)
     ShowRectOverlay([r], useColor, useDuration)
     LogInfo(Format("FlashLeafOutline: mon={}, leaf={}, color={}, dur={}ms", mon, leafId, useColor, useDuration))
 }
 
 ; Zeigt alle Snap-Areas des angegebenen Monitors als Overlay an.
 ShowAllSnapAreasForMonitor(mon) {
-    global OverlayColor, OverlayDuration
+    overlayColor := StateGet("OverlayColor", "Navy")
+    overlayDuration := StateGet("OverlayDuration", 1200)
     Layout_Ensure(mon)
     rects := Layout_AllLeafRects(mon)
     arr := []
@@ -163,7 +165,7 @@ ShowAllSnapAreasForMonitor(mon) {
     }
     if (arr.Length = 0)
         return
-    ShowRectOverlay(arr, OverlayColor, OverlayDuration)
+    ShowRectOverlay(arr, overlayColor, overlayDuration)
     LogInfo(Format("ShowAllSnapAreasForMonitor: mon={}, count={}", mon, arr.Length))
 }
 

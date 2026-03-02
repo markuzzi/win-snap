@@ -87,14 +87,13 @@ EnsureRestorable(hwnd) {
 ; --- Logging ---------------------------------------------------------------
 ; Schreibt eine Logzeile bei aktivem Logging und passendem Level.
 LogWrite(levelNum, levelName, msg) {
-    global LoggingEnabled, LoggingLevel, LoggingPath, FrameCompDebug, FrameCompLogPath
-    enabled := IsSet(LoggingEnabled) ? LoggingEnabled : (IsSet(FrameCompDebug) ? FrameCompDebug : false)
+    enabled := StateGet("LoggingEnabled", StateGet("FrameCompDebug", false))
     if (!enabled)
         return
-    thresh := IsSet(LoggingLevel) ? LoggingLevel : 2
+    thresh := StateGet("LoggingLevel", 2)
     if (levelNum > thresh)
         return
-    path := IsSet(LoggingPath) ? LoggingPath : (IsSet(FrameCompLogPath) ? FrameCompLogPath : A_ScriptDir "\WinSnap.log")
+    path := StateGet("LoggingPath", StateGet("FrameCompLogPath", A_ScriptDir "\WinSnap.log"))
     try {
         stamp := FormatTime(, "yyyy-MM-dd HH:mm:ss")
         FileAppend(stamp " | " levelName " | " msg "`n", path, "UTF-8")
@@ -434,8 +433,8 @@ MoveWindow(hwnd, x, y, w, h) {
 
     ; Highlight reaktivieren, falls bekanntem Leaf zugeordnet (optional unterdrückt)
     try {
-        global WinToLeaf, SuppressMoveHighlight
-        if (!IsSet(SuppressMoveHighlight) || !SuppressMoveHighlight) {
+        global WinToLeaf
+        if (!StateGet("SuppressMoveHighlight", false)) {
             if (WinToLeaf.Has(hwnd)) {
                 info := WinToLeaf[hwnd]
                 ApplyLeafHighlight(info.mon, info.leaf)

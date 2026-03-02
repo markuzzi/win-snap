@@ -277,12 +277,12 @@ WP_CreatePill(x, y, text, isActive, targetHwnd := 0) {
 ; --- Layout/update ---------------------------------------------------------
 
 WindowPills_Update() {
-    global WindowPillsEnabled, ScriptPaused
+    global WindowPillsEnabled
     if (!IsSet(WindowPillsEnabled) || !WindowPillsEnabled) {
         WindowPills_Clear()
         return
     }
-    if (IsSet(ScriptPaused) && ScriptPaused) {
+    if (StateGet("ScriptPaused", false)) {
         WindowPills_Clear()
         return
     }

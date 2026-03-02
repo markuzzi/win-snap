@@ -47,7 +47,7 @@ SnappedWindows_RestoreDelayed(*) {
 }
 
 SnappedWindows_RestoreFromStatus() {
-    global SnappedWindowsStatusPath, WinToLeaf, Layouts
+    global WinToLeaf, Layouts
     entries := SnappedWindows_LoadStatus()
     if (!(entries is Array) || entries.Length = 0)
         return 0
@@ -127,13 +127,15 @@ SnappedWindows_RestoreFromStatus() {
 }
 
 SnappedWindows_LoadStatus() {
-    global SnappedWindowsStatusPath
-    if (!IsSet(SnappedWindowsStatusPath) || SnappedWindowsStatusPath = "")
-        SnappedWindowsStatusPath := A_ScriptDir "\WinSnap_SnappedWindows.json"
-    if (!FileExist(SnappedWindowsStatusPath))
+    statusPath := StateGet("SnappedWindowsStatusPath", "")
+    if (statusPath = "") {
+        statusPath := A_ScriptDir "\WinSnap_SnappedWindows.json"
+        StateSet("SnappedWindowsStatusPath", statusPath)
+    }
+    if (!FileExist(statusPath))
         return []
     try {
-        text := FileRead(SnappedWindowsStatusPath, "UTF-8")
+        text := FileRead(statusPath, "UTF-8")
         if (!text || Trim(text) = "")
             return []
         data := jxon_load(&text)
@@ -285,31 +287,30 @@ SW_ToInt(value, defaultValue := 0) {
 }
 
 SnappedWindows_ScheduleWrite() {
-    global SnappedWindowsWritePending
-    if (!IsSet(SnappedWindowsWritePending))
-        SnappedWindowsWritePending := false
-    if (SnappedWindowsWritePending)
+    if (StateGet("SnappedWindowsWritePending", false))
         return
-    SnappedWindowsWritePending := true
+    StateSet("SnappedWindowsWritePending", true)
     try {
         SetTimer(SnappedWindows_Flush, -50)
     }
     catch Error as e {
-        SnappedWindowsWritePending := false
+        StateSet("SnappedWindowsWritePending", false)
         LogException(e, "SnappedWindows_ScheduleWrite")
     }
 }
 
 SnappedWindows_Flush(*) {
-    global SnappedWindowsWritePending
-    SnappedWindowsWritePending := false
+    StateSet("SnappedWindowsWritePending", false)
     SnappedWindows_WriteStatus()
 }
 
 SnappedWindows_WriteStatus() {
-    global WinToLeaf, SnappedWindowsStatusPath
-    if (!IsSet(SnappedWindowsStatusPath) || SnappedWindowsStatusPath = "")
-        SnappedWindowsStatusPath := A_ScriptDir "\WinSnap_SnappedWindows.json"
+    global WinToLeaf
+    statusPath := StateGet("SnappedWindowsStatusPath", "")
+    if (statusPath = "") {
+        statusPath := A_ScriptDir "\WinSnap_SnappedWindows.json"
+        StateSet("SnappedWindowsStatusPath", statusPath)
+    }
     try {
         data := []
         for hwnd, info in WinToLeaf {
@@ -350,7 +351,7 @@ SnappedWindows_WriteStatus() {
             row["leaf"] := info.leaf
             data.Push(row)
         }
-        f := FileOpen(SnappedWindowsStatusPath, "w", "UTF-8")
+        f := FileOpen(statusPath, "w", "UTF-8")
         if (f) {
             f.Write(jxon_dump(data, indent := 2))
             f.Close()

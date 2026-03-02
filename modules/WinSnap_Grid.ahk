@@ -377,8 +377,9 @@ AdjustBoundaryForActive(whichArrow) {
 
 ; Wechselt die Auswahl zur benachbarten Leaf-Area (optional mit Aktivierung).
 SwitchSnapArea(dir) {
-    global Layouts, ActivateOnAreaSwitch
-    LogInfo(Format("SwitchSnapArea: dir={} (activateOnSwitch={})", dir, (IsSet(ActivateOnAreaSwitch) && ActivateOnAreaSwitch)))
+    global Layouts
+    activateSwitch := StateGet("ActivateOnAreaSwitch", true)
+    LogInfo(Format("SwitchSnapArea: dir={} (activateOnSwitch={})", dir, activateSwitch))
     ctx := ApplyManualNavigation(GetLeafNavigationContext())
     if (!ctx.mon)
         return
@@ -398,7 +399,6 @@ SwitchSnapArea(dir) {
     if (neighbor) {
         SelectLeaf(ctx.mon, neighbor, "manual")
         target := LeafGetTopWindow(ctx.mon, neighbor)
-        activateSwitch := (IsSet(ActivateOnAreaSwitch) && ActivateOnAreaSwitch)
         if (activateSwitch && target)
             WinActivate "ahk_id " target
         else
@@ -416,7 +416,6 @@ SwitchSnapArea(dir) {
     }
     SelectLeaf(nextMon, leaf, "manual")
     target := LeafGetTopWindow(nextMon, leaf)
-    activateSwitch := (IsSet(ActivateOnAreaSwitch) && ActivateOnAreaSwitch)
     if (activateSwitch && target)
         WinActivate "ahk_id " target
     else
@@ -571,7 +570,8 @@ DeleteCurrentSnapArea() {
 
 ; Zeigt alle Snap-Areas auf allen Monitoren kurz als Overlay.
 ShowAllSnapAreasHotkey() {
-    global OverlayColor, OverlayDuration
+    overlayColor := StateGet("OverlayColor", "Navy")
+    overlayDuration := StateGet("OverlayDuration", 1200)
     count := MonitorGetCount()
     Loop count {
         mon := A_Index
@@ -587,7 +587,7 @@ ShowAllSnapAreasHotkey() {
         }
     }
     if (arr.Length)
-        ShowRectOverlay(arr, OverlayColor, OverlayDuration)
+        ShowRectOverlay(arr, overlayColor, overlayDuration)
 }
 
 

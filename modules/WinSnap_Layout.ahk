@@ -348,9 +348,9 @@ Layout_FindAxisSplitBetweenLeaves(mon, leafA, leafB, axis) {
 
 ; Wendet die aktuellen Rechtecke auf alle Fenster des Teilbaums erneut an.
 ReapplySubtree(mon, nodeId) {
-    global WinToLeaf, Layouts, SuppressMoveHighlight
-    wasSuppressed := (IsSet(SuppressMoveHighlight) && SuppressMoveHighlight)
-    SuppressMoveHighlight := true
+    global WinToLeaf, Layouts
+    wasSuppressed := StateGet("SuppressMoveHighlight", false)
+    StateSet("SuppressMoveHighlight", true)
     leaves := Layout_LeavesUnder(mon, nodeId)
     set := Map()
     for id in leaves
@@ -361,7 +361,7 @@ ReapplySubtree(mon, nodeId) {
             MoveWindow(hwnd, r.L, r.T, r.R - r.L, r.B - r.T)
         }
     }
-    SuppressMoveHighlight := wasSuppressed
+    StateSet("SuppressMoveHighlight", wasSuppressed)
     LogDebug(Format("ReapplySubtree: mon={}, node={}, leaves={} windows reapplied", mon, nodeId, leaves.Length))
 
     try {
@@ -377,8 +377,8 @@ ReapplySubtree(mon, nodeId) {
 ; =========================
 ; Speichert alle Layouts als JSON-Datei (multi-monitor-safe).
 Layout_SaveAll() {
-    global Layouts, LayoutSavePending
-    LayoutSavePending := false
+    global Layouts
+    StateSet("LayoutSavePending", false)
     try {
         SetTimer(Layout_FlushSave, 0)
     }
@@ -401,9 +401,8 @@ Layout_SaveAll() {
 
 ; Plant ein verzögertes Speichern (debounced), um Schreiblast zu reduzieren.
 Layout_ScheduleSave(delayMs := "") {
-    global LayoutSavePending, LayoutSaveDelayMs
     if (delayMs = "")
-        delayMs := IsSet(LayoutSaveDelayMs) ? LayoutSaveDelayMs : 500
+        delayMs := StateGet("LayoutSaveDelayMs", 500)
     delay := 500
     try {
         delay := Integer(delayMs)
@@ -413,21 +412,20 @@ Layout_ScheduleSave(delayMs := "") {
     }
     if (delay < 1)
         delay := 1
-    LayoutSavePending := true
+    StateSet("LayoutSavePending", true)
     try {
         SetTimer(Layout_FlushSave, -delay)
     }
     catch Error as e {
-        LayoutSavePending := false
+        StateSet("LayoutSavePending", false)
         LogException(e, "Layout_ScheduleSave: SetTimer failed")
     }
 }
 
 Layout_FlushSave(*) {
-    global LayoutSavePending
-    if (!IsSet(LayoutSavePending) || !LayoutSavePending)
+    if (!StateGet("LayoutSavePending", false))
         return
-    LayoutSavePending := false
+    StateSet("LayoutSavePending", false)
     Layout_SaveAll()
 }
 
@@ -682,8 +680,8 @@ SaveLeafAssignment(mon, leafId, hwnd) {
 
 ; Snappt bekannte (zugeordnete) Fenster an ihr Leaf, falls noetig.
 AutoSnap_AssignedWindows() {
-    global Layouts, ScriptPaused
-    if (IsSet(ScriptPaused) && ScriptPaused)
+    global Layouts
+    if (StateGet("ScriptPaused", false))
         return
     for mon, layout in Layouts {
         if (!IsObject(layout) || !layout.HasOwnProp("assignments"))
@@ -739,8 +737,8 @@ FindWindow(exe, title := "") {
 ; - Neue Fenster ohne Leaf-Zuordnung werden in die aktuell aktive SnapArea gesnappt.
 ; - Bereits zugeordnete Fenster werden bei Bedarf in ihr Leaf zurueckgesetzt (z.B. nach Restore).
 AutoSnap_NewlyStartedWindows() {
-    global Layouts, WinToLeaf, ScriptPaused
-    if (IsSet(ScriptPaused) && ScriptPaused)
+    global Layouts, WinToLeaf
+    if (StateGet("ScriptPaused", false))
         return
 
     ; Aktive SnapArea (Monitor + Leaf) bestimmen

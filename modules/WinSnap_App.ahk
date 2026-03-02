@@ -54,7 +54,6 @@ App_Startup() {
     }
     ShowTrayTip("WinSnap geladen - Layouts bereit", 1500)
 }
-
 App_OnExit(exitReason, exitCode) {
     try {
         Layout_FlushSave()
@@ -72,9 +71,9 @@ App_OnExit(exitReason, exitCode) {
 
 ; Schaltet Hotkeys und relevante Timer pausiert/aktiv (Toggle).
 TogglePause() {
-    global ScriptPaused, WindowPills
-    newState := !ScriptPaused
-    ScriptPaused := newState
+    global WindowPills
+    newState := !StateGet("ScriptPaused", false)
+    StateSet("ScriptPaused", newState)
     ; Timer steuern: Active-Highlight und AutoSnap-NewWindows
     try {
         SetTimer(UpdateActiveHighlight, newState ? 0 : 150)
@@ -183,8 +182,7 @@ InitTrayIcon() {
 
 ; Aktualisiert den Tray-Tooltip basierend auf dem Pausenstatus.
 UpdateTrayTooltip() {
-    global ScriptPaused
-    tip := ScriptPaused ? "WinSnap - Pausiert" : "WinSnap - Aktiv"
+    tip := StateGet("ScriptPaused", false) ? "WinSnap - Pausiert" : "WinSnap - Aktiv"
     try {
         A_IconTip := tip
     }
@@ -226,12 +224,12 @@ ShowTrayTip_Hide() {
 ; Initialisiert einen Shell-Hook, um Fenster-Ereignisse (Creation/Activation) zu empfangen
 ; und AutoSnap direkt auszul��sen (statt nur per Timer-Polling).
 InitShellHook() {
-    global ShellHookMsg
     try {
         ; Script-Fenster fǬr Shell-Hook registrieren
         DllCall("RegisterShellHookWindow", "ptr", A_ScriptHwnd)
-        ShellHookMsg := DllCall("RegisterWindowMessage", "str", "SHELLHOOK", "uint")
-        OnMessage(ShellHookMsg, ShellMessage_Handler)
+        msgId := DllCall("RegisterWindowMessage", "str", "SHELLHOOK", "uint")
+        StateSet("ShellHookMsg", msgId)
+        OnMessage(msgId, ShellMessage_Handler)
         LogInfo("InitShellHook: shell hook registered")
     }
     catch Error as e {
@@ -243,8 +241,7 @@ InitShellHook() {
 ; Reagiert auf Fenster-Erstellung, -Zerstörung und -Aktivierung.
 ShellMessage_Handler(wParam, lParam, msg, hwnd) {
     ; HSHELL_WINDOWCREATED = 1, HSHELL_WINDOWDESTROYED = 2, HSHELL_WINDOWACTIVATED = 4
-    global ScriptPaused
-    if (IsSet(ScriptPaused) && ScriptPaused) {
+    if (StateGet("ScriptPaused", false)) {
         if (wParam = 2) {
             try {
                 LeafDetachWindow(lParam, true)
