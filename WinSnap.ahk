@@ -60,6 +60,8 @@ global LoggingPath := FrameCompLogPath ; Pfad zur Logdatei
 global ScriptPaused := false           ; eigener Pause-Status (Hotkeys + Timer)
 global SnappedWindowsStatusPath := A_ScriptDir "\WinSnap_SnappedWindows.json" ; aktueller Snap-Status (Process/Class)
 global SnappedWindowsWritePending := false
+global LayoutSavePending := false
+global LayoutSaveDelayMs := 500
 global SuppressMoveHighlight := false  ; unterdrückt Highlight während Massen-Moves
 
 ; Window Pills Overlay (config)
@@ -114,10 +116,7 @@ global WindowPillsReserveChangeTolerance := 2  ; px; only reapply if change >= t
 #Include ".\modules\WinSnap_DragResize.ahk"
 #Include ".\modules\WinSnap_App.ahk"
 
-InitTrayIcon()
-InitShellHook()
-SnappedWindows_Init()
-ShowTrayTip("WinSnap geladen - Layouts bereit", 1500)
+App_Startup()
 
 ; =========================
 ; Hotkeys

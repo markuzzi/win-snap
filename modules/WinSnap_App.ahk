@@ -2,6 +2,74 @@
 ; App/Tray/State Funktionen
 ; =========================
 
+; Zentrale Startup-Sequenz in definierter Reihenfolge.
+App_Startup() {
+    try {
+        Layout_LoadAll()
+    }
+    catch Error as e {
+        LogException(e, "App_Startup: Layout_LoadAll failed")
+    }
+    try {
+        BlackList_Load()
+    }
+    catch Error as e {
+        LogException(e, "App_Startup: BlackList_Load failed")
+    }
+    try {
+        OnExit(App_OnExit)
+    }
+    catch Error as e {
+        LogException(e, "App_Startup: OnExit registration failed")
+    }
+    try {
+        InitTrayIcon()
+    }
+    catch Error as e {
+        LogException(e, "App_Startup: InitTrayIcon failed")
+    }
+    try {
+        InitShellHook()
+    }
+    catch Error as e {
+        LogException(e, "App_Startup: InitShellHook failed")
+    }
+    try {
+        SetTimer(AutoSnap_AssignedWindows, -100)
+    }
+    catch Error as e {
+        LogException(e, "App_Startup: AutoSnap_AssignedWindows timer failed")
+    }
+    try {
+        SnappedWindows_Init()
+    }
+    catch Error as e {
+        LogException(e, "App_Startup: SnappedWindows_Init failed")
+    }
+    try {
+        Highlight_Start()
+    }
+    catch Error as e {
+        LogException(e, "App_Startup: Highlight_Start failed")
+    }
+    ShowTrayTip("WinSnap geladen - Layouts bereit", 1500)
+}
+
+App_OnExit(exitReason, exitCode) {
+    try {
+        Layout_FlushSave()
+    }
+    catch Error as e {
+        LogException(e, "App_OnExit: Layout_FlushSave failed")
+    }
+    try {
+        SnappedWindows_Flush()
+    }
+    catch Error as e {
+        LogException(e, "App_OnExit: SnappedWindows_Flush failed")
+    }
+}
+
 ; Schaltet Hotkeys und relevante Timer pausiert/aktiv (Toggle).
 TogglePause() {
     global ScriptPaused, WindowPills

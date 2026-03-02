@@ -377,7 +377,14 @@ ReapplySubtree(mon, nodeId) {
 ; =========================
 ; Speichert alle Layouts als JSON-Datei (multi-monitor-safe).
 Layout_SaveAll() {
-    global Layouts
+    global Layouts, LayoutSavePending
+    LayoutSavePending := false
+    try {
+        SetTimer(Layout_FlushSave, 0)
+    }
+    catch Error as e {
+        ; best effort
+    }
     path := Layout_GetStoragePath()
     data := Layout_SerializeAll()
     try {
@@ -390,6 +397,38 @@ Layout_SaveAll() {
         MsgBox "Layout_SaveAll(): Fehler beim Schreiben der Layout-Datei!"
     }
     LogInfo(Format("Layout_SaveAll: saved to {}", path))
+}
+
+; Plant ein verzögertes Speichern (debounced), um Schreiblast zu reduzieren.
+Layout_ScheduleSave(delayMs := "") {
+    global LayoutSavePending, LayoutSaveDelayMs
+    if (delayMs = "")
+        delayMs := IsSet(LayoutSaveDelayMs) ? LayoutSaveDelayMs : 500
+    delay := 500
+    try {
+        delay := Integer(delayMs)
+    }
+    catch Error as e {
+        delay := 500
+    }
+    if (delay < 1)
+        delay := 1
+    LayoutSavePending := true
+    try {
+        SetTimer(Layout_FlushSave, -delay)
+    }
+    catch Error as e {
+        LayoutSavePending := false
+        LogException(e, "Layout_ScheduleSave: SetTimer failed")
+    }
+}
+
+Layout_FlushSave(*) {
+    global LayoutSavePending
+    if (!IsSet(LayoutSavePending) || !LayoutSavePending)
+        return
+    LayoutSavePending := false
+    Layout_SaveAll()
 }
 
 ; Laedt alle Layouts aus der JSON-Datei oder initialisiert Defaults.
@@ -637,8 +676,8 @@ SaveLeafAssignment(mon, leafId, hwnd) {
 
     assignments.Push({leaf:leafId, exe:exe, title:title})
 
-    Layout_SaveAll()
-    LogInfo(Format("SaveLeafAssignment: mon={}, leaf={}, exe={}, title={} -> saved", mon, leafId, exe, title))
+    Layout_ScheduleSave()
+    LogInfo(Format("SaveLeafAssignment: mon={}, leaf={}, exe={}, title={} -> queued", mon, leafId, exe, title))
 }
 
 ; Snappt bekannte (zugeordnete) Fenster an ihr Leaf, falls noetig.
@@ -785,15 +824,6 @@ SnapWindowToLeaf(hwnd, mon, leafId) {
 }
 
 
-
-Layout_LoadAll()
-BlackList_Load()
-
-; Nach dem Laden des Layouts:
-SetTimer(AutoSnap_AssignedWindows, -100)
-
-; Prüft regelmäßig auf neue Fenster, die einsortiert werden sollen
-; SetTimer(AutoSnap_NewlyStartedWindows, 2000)
 
 
 ; =========================

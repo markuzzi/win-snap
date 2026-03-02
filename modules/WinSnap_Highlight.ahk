@@ -123,5 +123,18 @@ UpdateActiveHighlight(*) {
     LogTrace("UpdateActiveHighlight tick")
 }
 
-UpdateActiveHighlight()
-SetTimer(UpdateActiveHighlight, 150)
+; Startet den Highlight-Ticker zentral aus der App-Startup-Sequenz.
+Highlight_Start() {
+    try {
+        UpdateActiveHighlight()
+    }
+    catch Error as e {
+        LogException(e, "Highlight_Start: initial update failed")
+    }
+    try {
+        SetTimer(UpdateActiveHighlight, 150)
+    }
+    catch Error as e {
+        LogException(e, "Highlight_Start: SetTimer failed")
+    }
+}
