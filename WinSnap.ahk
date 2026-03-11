@@ -165,6 +165,19 @@ StateToggle(key, default := false) {
 
 App_Startup()
 
+ApplyLayoutPreset(presetName, applyFn) {
+    applyFn.Call()
+    CollectWindowsInAllLeaves()
+    LogInfo(Format("Preset: {} + collect", presetName))
+}
+
+ApplyPreset5050AllMonitors() {
+    count := MonitorGetCount()
+    Loop count {
+        Layout_SetMonitorColumns(A_Index, [1, 1])
+    }
+}
+
 ; =========================
 ; Hotkeys
 ; =========================
@@ -310,7 +323,7 @@ Esc:: {
 !Down::  SwitchSnapArea("down")
 
 ; Alt+Space: Fenster-Suche f�r aktuelle Snap-Area
-!Space:: WindowSearch_Open()
+#Space:: WindowSearch_Open()
 
 ; Alt+Backspace/Delete: aktuelle Snap-Area entfernen
 !Backspace::DeleteCurrentSnapArea()
@@ -416,52 +429,42 @@ Esc:: {
 ; Alt+Ctrl+Win+1: Fullscreen (ein Leaf)
 ^#!1:: {
     mon := GetCurrentMonitorIndex()
-    Layout_ResetMonitor(mon)
-    LogInfo(Format("Preset: Fullscreen on mon={}", mon))
+    ApplyLayoutPreset(Format("Fullscreen on mon={}", mon), (*) => Layout_ResetMonitor(mon))
 }
 
 ; Alt+Ctrl+Win+2: 50/50 vertikal
 ^#!2:: {
     mon := GetCurrentMonitorIndex()
-    Layout_SetMonitorColumns(mon, [1, 1])
-    LogInfo(Format("Preset: 50/50 on mon={}", mon))
+    ApplyLayoutPreset(Format("50/50 on mon={}", mon), (*) => Layout_SetMonitorColumns(mon, [1, 1]))
 }
 
 ; Alt+Ctrl+Win+3: 33/33/33 vertikal
 ^#!3:: {
     mon := GetCurrentMonitorIndex()
-    Layout_SetMonitorColumns(mon, [1, 1, 1])
-    LogInfo(Format("Preset: 33/33/33 on mon={}", mon))
+    ApplyLayoutPreset(Format("33/33/33 on mon={}", mon), (*) => Layout_SetMonitorColumns(mon, [1, 1, 1]))
 }
 
 ; Alt+Ctrl+Win+4: 2x2 Quadranten
 ^#!4:: {
     mon := GetCurrentMonitorIndex()
-    Layout_SetMonitorQuadrants(mon)
-    LogInfo(Format("Preset: Quadrants on mon={}", mon))
+    ApplyLayoutPreset(Format("Quadrants on mon={}", mon), (*) => Layout_SetMonitorQuadrants(mon))
 }
 
 ; Alt+Ctrl+Win+5: 25/50/25 vertikal
 ^#!5:: {
     mon := GetCurrentMonitorIndex()
-    Layout_SetMonitorColumns(mon, [1, 2, 1])
-    LogInfo(Format("Preset: 25/50/25 on mon={}", mon))
+    ApplyLayoutPreset(Format("25/50/25 on mon={}", mon), (*) => Layout_SetMonitorColumns(mon, [1, 2, 1]))
 }
 
 ; Alt+Ctrl+Win+6: 70/30 vertikal
 ^#!6:: {
     mon := GetCurrentMonitorIndex()
-    Layout_SetMonitorColumns(mon, [7, 3])
-    LogInfo(Format("Preset: 70/30 on mon={}", mon))
+    ApplyLayoutPreset(Format("70/30 on mon={}", mon), (*) => Layout_SetMonitorColumns(mon, [7, 3]))
 }
 
 ; Alt+Ctrl+Win+0: alle Monitore 50/50
 ^#!0:: {
-    count := MonitorGetCount()
-    Loop count {
-        Layout_SetMonitorColumns(A_Index, [1, 1])
-    }
-    LogInfo("Preset: 50/50 on all monitors")
+    ApplyLayoutPreset("50/50 on all monitors", ApplyPreset5050AllMonitors)
 }
 
 #HotIf
