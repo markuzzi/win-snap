@@ -17,6 +17,12 @@ App_Startup() {
         LogException(e, "App_Startup: BlackList_Load failed")
     }
     try {
+        PillBlackList_Load()
+    }
+    catch Error as e {
+        LogException(e, "App_Startup: PillBlackList_Load failed")
+    }
+    try {
         OnExit(App_OnExit)
     }
     catch Error as e {

@@ -382,11 +382,19 @@ WindowPills_Update() {
         items := []  ; each: { gui, ctrl, pic, w, h, hwnd }
         for hwnd in arr {
             try {
+                hClass := WinGetClass("ahk_id " hwnd)
+            }
+            catch Error as e {
+                hClass := ""
+            }
+            try {
                 title := WinGetTitle("ahk_id " hwnd)
             }
             catch Error as e {
                 title := ""
             }
+            if (IsPillBlacklisted(hClass, title))
+                continue
             if (title = "")
                 title := "(untitled)"
             txt := WP_TruncateTitle(title, WindowPillsMaxTitle)
@@ -689,6 +697,44 @@ WP_OnPillContextMenu(targetHwnd) {
         m.Add("Aus AutoSnap-Blacklist entfernen", (*) => 0)
         m.Disable("Aus AutoSnap-Blacklist entfernen")
     }
+
+    m.Add()
+
+    ; Pill-Blacklist
+    global PillBlackList
+    if (!IsSet(PillBlackList) || !(PillBlackList is Map))
+        PillBlackList := Map()
+    classKey := "class:" . info.className
+    titleKey  := (info.title ? "title:" . info.title : "")
+    comboKey  := (info.className && info.title ? "class:" . info.className . "|title:" . info.title : "")
+    pillHasClass := (info.className != "" && PillBlackList.Has(classKey))
+    pillHasTitle := (titleKey != "" && PillBlackList.Has(titleKey))
+    pillHasCombo := (comboKey != "" && PillBlackList.Has(comboKey))
+
+    if (!pillHasClass) {
+        m.Add("Zu Pill-Blacklist hinzufuegen (Klasse)", (*) => WP_AddWindowToPillBlacklist(targetHwnd, "class"))
+    } else {
+        m.Add("Zu Pill-Blacklist hinzufuegen (Klasse) [aktiv]", (*) => 0)
+        m.Disable("Zu Pill-Blacklist hinzufuegen (Klasse) [aktiv]")
+    }
+    if (info.title) {
+        if (!pillHasTitle) {
+            m.Add("Zu Pill-Blacklist hinzufuegen (Titel)", (*) => WP_AddWindowToPillBlacklist(targetHwnd, "title"))
+        } else {
+            m.Add("Zu Pill-Blacklist hinzufuegen (Titel) [aktiv]", (*) => 0)
+            m.Disable("Zu Pill-Blacklist hinzufuegen (Titel) [aktiv]")
+        }
+        if (!pillHasCombo) {
+            m.Add("Zu Pill-Blacklist hinzufuegen (Klasse+Titel)", (*) => WP_AddWindowToPillBlacklist(targetHwnd, "combo"))
+        } else {
+            m.Add("Zu Pill-Blacklist hinzufuegen (Klasse+Titel) [aktiv]", (*) => 0)
+            m.Disable("Zu Pill-Blacklist hinzufuegen (Klasse+Titel) [aktiv]")
+        }
+    }
+    if (pillHasClass || pillHasTitle || pillHasCombo) {
+        m.Add("Aus Pill-Blacklist entfernen", (*) => WP_RemoveWindowFromPillBlacklist(targetHwnd))
+    }
+
     m.Add()
     m.Add("Fenster aktivieren", (*) => WP_OnPillClick(targetHwnd))
     m.Add("Info: " . label, (*) => 0)
@@ -731,9 +777,14 @@ WP_GetWindowIdentity(hwnd) {
     } catch {
         className := ""
     }
+    try {
+        title := WinGetTitle("ahk_id " hwnd)
+    } catch {
+        title := ""
+    }
     if (!exe || !className)
         return 0
-    return { exe:exe, className:className }
+    return { exe:exe, className:className, title:title }
 }
 
 WP_AddWindowToBlacklist(hwnd) {
@@ -752,6 +803,77 @@ WP_AddWindowToBlacklist(hwnd) {
     try BlackList_Save()
     ShowTrayTip("AutoSnap Blacklist hinzugefuegt: " . info.exe . " (" . info.className . ")", 1500)
     LogInfo(Format("WP_AddWindowToBlacklist: added exe={}, class={}", info.exe, info.className))
+}
+
+WP_AddWindowToPillBlacklist(hwnd, mode) {
+    global PillBlackList
+    info := WP_GetWindowIdentity(hwnd)
+    if (!info)
+        return
+    if (!IsSet(PillBlackList) || !(PillBlackList is Map))
+        PillBlackList := Map()
+    if (mode = "class") {
+        key   := "class:" . info.className
+        label := info.className
+    } else if (mode = "title") {
+        if (!info.title) {
+            ShowTrayTip("Kein Fenstertitel vorhanden", 1500)
+            return
+        }
+        key   := "title:" . info.title
+        label := info.title
+    } else { ; combo
+        if (!info.title) {
+            ShowTrayTip("Kein Fenstertitel vorhanden", 1500)
+            return
+        }
+        key   := "class:" . info.className . "|title:" . info.title
+        label := info.className . " + " . info.title
+    }
+    if (PillBlackList.Has(key)) {
+        ShowTrayTip("Bereits auf Pill-Blacklist: " . label, 1500)
+        return
+    }
+    PillBlackList[key] := true
+    try PillBlackList_Save()
+    ShowTrayTip("Pill-Blacklist hinzugefuegt (" . mode . "): " . label, 1500)
+    LogInfo(Format("WP_AddWindowToPillBlacklist: added {}={}", mode, label))
+    try {
+        global WindowPills
+        WindowPills.lastSig := ""
+    }
+    WindowPills_Invalidate()
+}
+
+WP_RemoveWindowFromPillBlacklist(hwnd) {
+    global PillBlackList
+    info := WP_GetWindowIdentity(hwnd)
+    if (!info)
+        return
+    if (!IsSet(PillBlackList) || !(PillBlackList is Map))
+        PillBlackList := Map()
+    classKey := "class:" . info.className
+    titleKey  := (info.title ? "title:" . info.title : "")
+    comboKey  := (info.title ? "class:" . info.className . "|title:" . info.title : "")
+    changed := false
+    if (PillBlackList.Has(classKey))
+        PillBlackList.Delete(classKey), changed := true
+    if (titleKey && PillBlackList.Has(titleKey))
+        PillBlackList.Delete(titleKey), changed := true
+    if (comboKey && PillBlackList.Has(comboKey))
+        PillBlackList.Delete(comboKey), changed := true
+    if (!changed) {
+        ShowTrayTip("Nicht auf Pill-Blacklist", 1500)
+        return
+    }
+    try PillBlackList_Save()
+    ShowTrayTip("Pill-Blacklist entfernt: " . info.className, 1500)
+    LogInfo(Format("WP_RemoveWindowFromPillBlacklist: removed class={}, title={}", info.className, info.title))
+    try {
+        global WindowPills
+        WindowPills.lastSig := ""
+    }
+    WindowPills_Invalidate()
 }
 
 WP_RemoveWindowFromBlacklist(hwnd) {

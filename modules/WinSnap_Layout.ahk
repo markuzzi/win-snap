@@ -627,6 +627,71 @@ IsBlacklistedExe(exe, className := "") {
 }
 
 
+; --- Pill-Blacklist -----------------------------------------------------------
+
+PillBlackList_GetStoragePath() {
+    return A_ScriptDir "\WinSnap_PillBlackList.json"
+}
+
+PillBlackList_Load() {
+    global PillBlackList
+    path := PillBlackList_GetStoragePath()
+    PillBlackList := Map()
+    if (!FileExist(path))
+        return
+    try {
+        text := FileRead(path, "UTF-8")
+        data := jxon_load(&text)
+    } catch {
+        LogInfo("PillBlackList_Load: failed to read or parse file")
+        return
+    }
+    if !(data is Map)
+        return
+    for key, flag in data {
+        if (!key || !flag)
+            continue
+        PillBlackList[key] := true
+    }
+}
+
+PillBlackList_Save() {
+    global PillBlackList
+    path := PillBlackList_GetStoragePath()
+    if (!IsSet(PillBlackList) || !(PillBlackList is Map))
+        PillBlackList := Map()
+    data := Map()
+    for key, flag in PillBlackList {
+        if (flag)
+            data[key] := true
+    }
+    try {
+        f := FileOpen(path, "w", "UTF-8")
+        if (f) {
+            f.Write(jxon_dump(data, indent := 2))
+            f.Close()
+        }
+    } catch {
+        MsgBox "PillBlackList_Save(): Fehler beim Schreiben der PillBlackList-Datei!"
+    }
+    LogInfo(Format("PillBlackList_Save: saved to {}", path))
+}
+
+; Prueft, ob ein Fenster (nach Klasse, Titel oder Klasse+Titel) auf der Pill-Blacklist steht.
+IsPillBlacklisted(className, title := "") {
+    global PillBlackList
+    if (!IsSet(PillBlackList) || !(PillBlackList is Map))
+        PillBlackList := Map()
+    if (className && PillBlackList.Has("class:" . className))
+        return true
+    if (title && PillBlackList.Has("title:" . title))
+        return true
+    if (className && title && PillBlackList.Has("class:" . className . "|title:" . title))
+        return true
+    return false
+}
+
+
 ; Window Leaf Assignments speichern/laden
 ; Speichert eine Zuordnung (exe+title) fuer ein Leaf des Monitors.
 SaveLeafAssignment(mon, leafId, hwnd) {

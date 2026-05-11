@@ -28,6 +28,7 @@ global AppState := {
     MaximizeRestoreState: Map(),  ; hwnd -> {snapped:bool, mon:idx, leaf:id}
     LeafWindows: Map(),           ; (mon:leaf) -> [hwnd,...]
     AutoSnapBlackList: Map(),     ; exe/class -> true
+    PillBlackList: Map(),         ; class:/title: -> true
     ; Layout pro Monitor:
     ; Layouts[mon] = { root: id, next: id, nodes: Map() }
     ; Node: {id, parent, split: ""|"v"|"h", frac: float, a: id, b: id}
@@ -73,6 +74,7 @@ global WinToLeaf := AppState.WinToLeaf
 global MaximizeRestoreState := AppState.MaximizeRestoreState
 global LeafWindows := AppState.LeafWindows
 global AutoSnapBlackList := AppState.AutoSnapBlackList
+global PillBlackList := AppState.PillBlackList
 global Layouts := AppState.Layouts
 global HL := AppState.HL
 global CurrentHighlight := AppState.CurrentHighlight
@@ -456,8 +458,14 @@ Esc:: {
     ApplyLayoutPreset(Format("25/50/25 on mon={}", mon), (*) => Layout_SetMonitorColumns(mon, [1, 2, 1]))
 }
 
-; Alt+Ctrl+Win+6: 70/30 vertikal
+; Alt+Ctrl+Win+6: 20/60/20 vertikal
 ^#!6:: {
+    mon := GetCurrentMonitorIndex()
+    ApplyLayoutPreset(Format("70/30 on mon={}", mon), (*) => Layout_SetMonitorColumns(mon, [1, 3, 1]))
+}
+
+; Alt+Ctrl+Win+7: 70/30 vertikal
+^#!7:: {
     mon := GetCurrentMonitorIndex()
     ApplyLayoutPreset(Format("70/30 on mon={}", mon), (*) => Layout_SetMonitorColumns(mon, [7, 3]))
 }
