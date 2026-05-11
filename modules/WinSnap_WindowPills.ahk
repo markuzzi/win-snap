@@ -115,6 +115,276 @@ WP_TruncateTitle(txt, maxLen) {
     return SubStr(txt, 1, maxLen - 1) . "…"
 }
 
+WP_AddWindowIconPicture(g, targetHwnd, iconSize) {
+    path := ""
+    try path := WinGetProcessPath("ahk_id " targetHwnd)
+
+    ; MSIX/Store apps often keep their real icon in package PNG assets, not in the exe.
+    if (path) {
+        pic := WP_TryAddMsixIconPicture(g, path, iconSize)
+        if (IsObject(pic))
+            return pic
+    }
+
+    if (path && FileExist(path)) {
+        pic := WP_TryAddExeIconPicture(g, path, iconSize)
+        if (IsObject(pic))
+            return pic
+    }
+
+    pic := WP_TryAddWindowHandleIconPicture(g, targetHwnd, iconSize)
+    if (IsObject(pic))
+        return pic
+
+    if (path && FileExist(path)) {
+        pic := WP_TryAddShellIconPicture(g, path, iconSize)
+        if (IsObject(pic))
+            return pic
+    }
+
+    return 0
+}
+
+WP_TryAddExeIconPicture(g, path, iconSize) {
+    try {
+        return g.AddPicture(Format("xm ym w{} h{} Icon1 BackgroundTrans", iconSize, iconSize), path)
+    }
+    catch Error as e {
+        return 0
+    }
+}
+
+WP_TryAddWindowHandleIconPicture(g, hwnd, iconSize) {
+    hIcon := WP_GetWindowIconHandle(hwnd)
+    if (!hIcon)
+        return 0
+    try {
+        return g.AddPicture(Format("xm ym w{} h{} BackgroundTrans", iconSize, iconSize), "HICON:*" hIcon)
+    }
+    catch Error as e {
+        return 0
+    }
+}
+
+WP_TryAddShellIconPicture(g, path, iconSize) {
+    try {
+        sfiSize := A_PtrSize + 688
+        sfi := Buffer(sfiSize, 0)
+        flags := 0x100  ; SHGFI_ICON
+        flags |= (iconSize <= 16) ? 0x1 : 0x0  ; SHGFI_SMALLICON / SHGFI_LARGEICON
+        if (!DllCall("shell32\SHGetFileInfoW", "WStr", path, "UInt", 0, "Ptr", sfi.Ptr, "UInt", sfiSize, "UInt", flags, "Ptr"))
+            return 0
+        hIcon := NumGet(sfi, 0, "Ptr")
+        if (!hIcon)
+            return 0
+        pic := 0
+        try pic := g.AddPicture(Format("xm ym w{} h{} BackgroundTrans", iconSize, iconSize), "HICON:*" hIcon)
+        try DllCall("DestroyIcon", "Ptr", hIcon)
+        return IsObject(pic) ? pic : 0
+    }
+    catch Error as e {
+        try {
+            if (IsSet(hIcon) && hIcon)
+                DllCall("DestroyIcon", "Ptr", hIcon)
+        }
+        return 0
+    }
+}
+
+WP_GetWindowIconHandle(hwnd) {
+    static WM_GETICON := 0x7F
+    if (!hwnd)
+        return 0
+
+    for iconType in [2, 0, 1] {  ; ICON_SMALL2, ICON_SMALL, ICON_BIG
+        try {
+            hIcon := SendMessage(WM_GETICON, iconType, 0,, "ahk_id " hwnd)
+            if (hIcon)
+                return hIcon
+        }
+    }
+
+    fn := (A_PtrSize = 8) ? "GetClassLongPtrW" : "GetClassLongW"
+    for index in [-34, -14] {  ; GCLP_HICONSM, GCLP_HICON
+        try {
+            hIcon := DllCall(fn, "Ptr", hwnd, "Int", index, "Ptr")
+            if (hIcon)
+                return hIcon
+        }
+    }
+    return 0
+}
+
+WP_TryAddMsixIconPicture(g, processPath, iconSize) {
+    asset := WP_GetMsixIconAsset(processPath, iconSize)
+    if (asset = "" || !FileExist(asset))
+        return 0
+    try {
+        return g.AddPicture(Format("xm ym w{} h{} BackgroundTrans", iconSize, iconSize), asset)
+    }
+    catch Error as e {
+        return 0
+    }
+}
+
+WP_GetMsixIconAsset(processPath, iconSize) {
+    static cache := Map()
+    packageRoot := WP_FindMsixPackageRoot(processPath)
+    if (packageRoot = "")
+        return ""
+
+    key := packageRoot "|" iconSize
+    if (cache.Has(key))
+        return cache[key]
+
+    best := ""
+    for relPath in WP_ReadMsixLogoRefs(packageRoot) {
+        best := WP_FindBestMsixAsset(packageRoot, relPath, iconSize)
+        if (best != "")
+            break
+    }
+
+    cache[key] := best
+    return best
+}
+
+WP_FindMsixPackageRoot(path) {
+    static cache := Map()
+    if (path = "")
+        return ""
+    if (cache.Has(path))
+        return cache[path]
+
+    dir := path
+    if (!InStr(FileExist(path), "D")) {
+        try SplitPath path, , &dir
+    }
+
+    Loop 8 {
+        if (dir = "")
+            break
+        if (FileExist(dir "\AppxManifest.xml")) {
+            cache[path] := dir
+            return dir
+        }
+        parent := ""
+        try SplitPath dir, , &parent
+        if (parent = "" || parent = dir)
+            break
+        dir := parent
+    }
+    cache[path] := ""
+    return ""
+}
+
+WP_ReadMsixLogoRefs(packageRoot) {
+    refs := []
+    seen := Map()
+    manifestPath := packageRoot "\AppxManifest.xml"
+    if (!FileExist(manifestPath))
+        return refs
+
+    try {
+        doc := ComObject("MSXML2.DOMDocument.6.0")
+        doc.async := false
+        doc.setProperty("SelectionLanguage", "XPath")
+        if (!doc.load(manifestPath))
+            return refs
+
+        nodes := doc.selectNodes("//*[local-name()='VisualElements']")
+        for node in nodes {
+            for attr in ["Square44x44Logo", "Square150x150Logo", "Logo"] {
+                relPath := node.getAttribute(attr)
+                if (relPath != "" && !seen.Has(relPath)) {
+                    seen[relPath] := true
+                    refs.Push(relPath)
+                }
+            }
+        }
+    }
+    catch Error as e {
+        return refs
+    }
+
+    return refs
+}
+
+WP_FindBestMsixAsset(packageRoot, relPath, iconSize) {
+    base := WP_NormalizeMsixAssetPath(packageRoot, relPath)
+    if (base = "")
+        return ""
+
+    candidates := []
+    seen := Map()
+    WP_PushUniquePath(candidates, seen, base)
+
+    try {
+        SplitPath base, , &dir, &ext, &nameNoExt
+        if (dir != "" && ext != "") {
+            Loop Files, dir "\" nameNoExt "*." ext, "F" {
+                WP_PushUniquePath(candidates, seen, A_LoopFileFullPath)
+            }
+        }
+    }
+
+    best := ""
+    bestScore := 1000000
+    for candidate in candidates {
+        if (!FileExist(candidate))
+            continue
+        score := WP_ScoreMsixAsset(candidate, iconSize)
+        if (score < bestScore) {
+            best := candidate
+            bestScore := score
+        }
+    }
+    return best
+}
+
+WP_NormalizeMsixAssetPath(packageRoot, relPath) {
+    relPath := Trim(relPath)
+    if (relPath = "" || InStr(relPath, ":"))
+        return ""
+    relPath := StrReplace(relPath, "/", "\")
+    relPath := RegExReplace(relPath, "^\\+")
+    return packageRoot "\" relPath
+}
+
+WP_PushUniquePath(arr, seen, path) {
+    if (path = "" || seen.Has(path))
+        return
+    seen[path] := true
+    arr.Push(path)
+}
+
+WP_ScoreMsixAsset(path, requestedSize) {
+    SplitPath path, &fileName
+    name := StrLower(fileName)
+    score := 5000
+
+    if (RegExMatch(name, "targetsize-(\d+)", &m)) {
+        score := Abs(Integer(m[1]) - requestedSize)
+    } else if (RegExMatch(name, "scale-(\d+)", &m)) {
+        baseSize := 44
+        if (RegExMatch(name, "square(\d+)x", &m2))
+            baseSize := Integer(m2[1])
+        score := 100 + Abs(Round(baseSize * Integer(m[1]) / 100) - requestedSize)
+    } else if (RegExMatch(name, "square(\d+)x", &m)) {
+        score := 200 + Abs(Integer(m[1]) - requestedSize)
+    }
+
+    if (InStr(name, "targetsize"))
+        score -= 30
+    if (InStr(name, "altform-unplated"))
+        score -= 20
+    if (InStr(name, "contrast"))
+        score += 300
+    if (InStr(name, "badge") || InStr(name, "splash"))
+        score += 500
+
+    return score
+}
+
 WP_BuildStateSignature() {
     ; Create a compact signature of all leaf->window lists and the focused hwnd.
     global LeafWindows, WindowPillsEnabled, WindowPillsMaxTitle
@@ -184,7 +454,7 @@ WP_CreatePill(x, y, text, isActive, targetHwnd := 0) {
     global WindowPillsFont, WindowPillsFontSize
     global WindowPillsTextColor, WindowPillsActiveTextColor
     global WindowPillsPaddingX, WindowPillsPaddingY
-    global WindowPillsShowIcons, WindowPillsIconSize
+    global WindowPillsShowIcons, WindowPillsIconSize, WindowPillsIconGap
 
     color := isActive ? WindowPillColorActive : WindowPillColor
     tColor := isActive ? WindowPillsActiveTextColor : WindowPillsTextColor
@@ -209,16 +479,10 @@ WP_CreatePill(x, y, text, isActive, targetHwnd := 0) {
     pic := 0
     iconOk := false
     if (IsSet(WindowPillsShowIcons) && WindowPillsShowIcons && targetHwnd) {
-        try {
-            path := WinGetProcessPath("ahk_id " targetHwnd)
-            if (path && FileExist(path)) {
-                pic := g.AddPicture(Format("xm ym w{} h{} Icon1 BackgroundTrans", WindowPillsIconSize, WindowPillsIconSize), path)
-                iconOk := true
-            }
-        }
-        catch Error as e {
-            LogDebug("WindowPills: AddPicture (icon) failed")
-        }
+        pic := WP_AddWindowIconPicture(g, targetHwnd, WindowPillsIconSize)
+        iconOk := IsObject(pic)
+        if (!iconOk)
+            LogDebug("WindowPills: no icon available for pill")
     }
     ctrl := g.AddText("x+0 ym +0x0100 BackgroundTrans", text) ; +SS_NOTIFY for click
 
