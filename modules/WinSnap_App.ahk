@@ -58,6 +58,12 @@ App_Startup() {
     catch Error as e {
         LogException(e, "App_Startup: Highlight_Start failed")
     }
+    try {
+        WindowPills_StartBadgeRefresh()
+    }
+    catch Error as e {
+        LogException(e, "App_Startup: WindowPills_StartBadgeRefresh failed")
+    }
     ShowTrayTip("WinSnap geladen - Layouts bereit", 1500)
 }
 App_OnExit(exitReason, exitCode) {

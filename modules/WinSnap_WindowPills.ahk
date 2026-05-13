@@ -98,6 +98,27 @@ WindowPills_Toggle() {
     LogInfo(Format("WindowPills_Toggle: {}", WindowPillsEnabled ? "ENABLED" : "DISABLED"))
 }
 
+WindowPills_StartBadgeRefresh() {
+    global WindowPillsBadgeRefreshInterval
+    interval := (IsSet(WindowPillsBadgeRefreshInterval) ? WindowPillsBadgeRefreshInterval : 0)
+    if (interval > 0)
+        SetTimer(WindowPills_BadgeRefreshTick, interval)
+}
+
+WindowPills_BadgeRefreshTick(*) {
+    global WindowPillsEnabled
+    if (!IsSet(WindowPillsEnabled) || !WindowPillsEnabled)
+        return
+    if (StateGet("ScriptPaused", false))
+        return
+    try {
+        WindowPills_Update()
+    }
+    catch Error as e {
+        LogException(e, "WindowPills_BadgeRefreshTick: update failed")
+    }
+}
+
 ; --- Helpers ---------------------------------------------------------------
 
 WP_TruncateTitle(txt, maxLen) {
@@ -113,6 +134,93 @@ WP_TruncateTitle(txt, maxLen) {
     if (maxLen <= 1)
         return "…"
     return SubStr(txt, 1, maxLen - 1) . "…"
+}
+
+WP_GetPillDisplayText(className, title) {
+    global WindowPillsMaxTitle
+    badge := WP_ExtractBadgeFromTitle(className, title)
+    displayTitle := badge.title
+    if (displayTitle = "")
+        displayTitle := "(untitled)"
+    txt := WP_TruncateTitle(displayTitle, WindowPillsMaxTitle)
+    if (badge.count != "")
+        txt .= WP_FormatBadgeCount(badge.count)
+    return txt
+}
+
+WP_ExtractBadgeFromTitle(className, title) {
+    global WindowPillsBadgesEnabled, WindowPillsBadgeRules
+    if (!IsSet(WindowPillsBadgesEnabled) || !WindowPillsBadgesEnabled)
+        return { count:"", title:title }
+    if (!IsSet(WindowPillsBadgeRules) || !(WindowPillsBadgeRules is Array))
+        return { count:"", title:title }
+    for rule in WindowPillsBadgeRules {
+        try {
+            titleRegex := WP_GetRuleProp(rule, "titleRegex", "")
+            if (titleRegex = "")
+                continue
+            classRegex := WP_GetRuleProp(rule, "classRegex", "")
+            if (classRegex != "" && !RegExMatch(className, classRegex))
+                continue
+            if (!RegExMatch(title, titleRegex, &m))
+                continue
+            badgeGroup := WP_GetRuleProp(rule, "badgeGroup", 1)
+            count := WP_GetMatchGroup(m, badgeGroup)
+            if (count = "")
+                continue
+            count := Trim(count)
+            titleGroup := WP_GetRuleProp(rule, "titleGroup", 0)
+            displayTitle := title
+            if (titleGroup) {
+                matchedTitle := Trim(WP_GetMatchGroup(m, titleGroup))
+                if (matchedTitle != "")
+                    displayTitle := matchedTitle
+            }
+            return { count:count, title:displayTitle }
+        }
+        catch Error as e {
+            LogException(e, "WP_ExtractBadgeFromTitle: rule failed")
+        }
+    }
+    return { count:"", title:title }
+}
+
+WP_GetRuleProp(rule, propName, defaultValue := "") {
+    if (!IsObject(rule))
+        return defaultValue
+    try {
+        if (rule is Map) {
+            if (rule.Has(propName))
+                return rule[propName]
+        } else if (rule.HasOwnProp(propName)) {
+            return rule.%propName%
+        }
+    }
+    catch Error as e {
+    }
+    return defaultValue
+}
+
+WP_GetMatchGroup(match, groupIndex) {
+    try {
+        if (groupIndex = "" || groupIndex = 0)
+            return ""
+        return match[groupIndex]
+    }
+    catch Error as e {
+        return ""
+    }
+}
+
+WP_FormatBadgeCount(count) {
+    global WindowPillsBadgeFormat
+    fmt := (IsSet(WindowPillsBadgeFormat) && WindowPillsBadgeFormat != "") ? WindowPillsBadgeFormat : " [{}]"
+    try {
+        return Format(fmt, count)
+    }
+    catch Error as e {
+        return " [" . count . "]"
+    }
 }
 
 WP_AddWindowIconPicture(g, targetHwnd, iconSize) {
@@ -388,6 +496,7 @@ WP_ScoreMsixAsset(path, requestedSize) {
 WP_BuildStateSignature() {
     ; Create a compact signature of all leaf->window lists and the focused hwnd.
     global LeafWindows, WindowPillsEnabled, WindowPillsMaxTitle
+    global WindowPillsBadgesEnabled, WindowPillsBadgeFormat
     sig := []
     focused := 0
     try {
@@ -398,12 +507,19 @@ WP_BuildStateSignature() {
     }
     sig.Push("E:" (WindowPillsEnabled ? 1 : 0))
     sig.Push("M:" (IsSet(WindowPillsMaxTitle) ? WindowPillsMaxTitle : 20))
+    sig.Push("B:" ((IsSet(WindowPillsBadgesEnabled) && WindowPillsBadgesEnabled) ? 1 : 0))
+    sig.Push("BF:" (IsSet(WindowPillsBadgeFormat) ? WindowPillsBadgeFormat : ""))
     entries := []
     for key, arr in LeafWindows {
         ; key is "mon:leaf"
         ids := []
-        for hwnd in arr
-            ids.Push("" hwnd)
+        for hwnd in arr {
+            hClass := "", title := ""
+            try hClass := WinGetClass("ahk_id " hwnd)
+            try title := WinGetTitle("ahk_id " hwnd)
+            displayText := WP_GetPillDisplayText(hClass, title)
+            ids.Push("" hwnd "#" hClass "#" displayText)
+        }
         ; sort ids for stability
         try {
             ids := ArraySort(ids, StrCompare)
@@ -659,9 +775,7 @@ WindowPills_Update() {
             }
             if (IsPillBlacklisted(hClass, title))
                 continue
-            if (title = "")
-                title := "(untitled)"
-            txt := WP_TruncateTitle(title, WindowPillsMaxTitle)
+            txt := WP_GetPillDisplayText(hClass, title)
             isActive := (hwnd = activeHwnd)
             obj := WP_CreatePill(-10000, -10000, txt, isActive, hwnd)
             ; measure

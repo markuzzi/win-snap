@@ -108,6 +108,13 @@ global WindowPillsActiveBorderPx := 3
 global WindowPillsShowIcons := true    ; Icons in Pills anzeigen
 global WindowPillsIconSize := 16       ; Icon-Größe (px)
 global WindowPillsIconGap := 6         ; Abstand Icon↔Text
+global WindowPillsBadgesEnabled := true
+global WindowPillsBadgeRefreshInterval := 8000 ; ms; 0 = kein periodischer Badge-Refresh
+global WindowPillsBadgeFormat := " [{}]"
+global WindowPillsBadgeRules := [
+    { titleRegex:"^\s*[\(\[]([1-9]\d{0,3}\+?)[\)\]]\s+(.+)$", badgeGroup:1, titleGroup:2 },
+    { titleRegex:"^\s*(.+)\s+[\(\[]([1-9]\d{0,3}\+?)[\)\]]$", badgeGroup:2, titleGroup:1 }
+]
 global WindowPillsReserveAllLeaves := true
 global WindowPillsReserveDefaultPx := (2*WindowPillsMarginY) + (2*WindowPillsPaddingY) + Ceil(WindowPillsFontSize*1.6)
 
