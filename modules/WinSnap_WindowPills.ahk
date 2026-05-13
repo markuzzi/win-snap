@@ -1084,15 +1084,21 @@ WP_AddWindowToPillBlacklist(hwnd, mode) {
             ShowTrayTip("Kein Fenstertitel vorhanden", 1500)
             return
         }
-        key   := "title:" . info.title
-        label := info.title
+        pattern := WP_RequestPillTitleRegex(info.title)
+        if (pattern = "")
+            return
+        key   := "titleRegex:" . pattern
+        label := pattern
     } else { ; combo
         if (!info.title) {
             ShowTrayTip("Kein Fenstertitel vorhanden", 1500)
             return
         }
-        key   := "class:" . info.className . "|title:" . info.title
-        label := info.className . " + " . info.title
+        pattern := WP_RequestPillTitleRegex(info.title)
+        if (pattern = "")
+            return
+        key   := "class:" . info.className . "|titleRegex:" . pattern
+        label := info.className . " + " . pattern
     }
     if (PillBlackList.Has(key)) {
         ShowTrayTip("Bereits auf Pill-Blacklist: " . label, 1500)
@@ -1107,6 +1113,44 @@ WP_AddWindowToPillBlacklist(hwnd, mode) {
         WindowPills.lastSig := ""
     }
     WindowPills_Invalidate()
+}
+
+WP_RequestPillTitleRegex(title) {
+    defaultPattern := "^" . WP_EscapeRegex(title) . "$"
+    try {
+        ib := InputBox("Regex fuer den Fenstertitel:", "Pill-Blacklist", "w520 h140", defaultPattern)
+    } catch Error as e {
+        LogException(e, "WP_RequestPillTitleRegex: InputBox failed")
+        return ""
+    }
+    if (ib.Result != "OK")
+        return ""
+    pattern := Trim(ib.Value)
+    if (pattern = "") {
+        ShowTrayTip("Leerer Regex - nicht hinzugefuegt", 1500)
+        return ""
+    }
+    try {
+        RegExMatch(title, pattern)
+    } catch Error as e {
+        MsgBox("Ungueltiger Regex:`n" . pattern, "Pill-Blacklist")
+        LogException(e, "WP_RequestPillTitleRegex: invalid regex")
+        return ""
+    }
+    return pattern
+}
+
+WP_EscapeRegex(text) {
+    special := "\.^$|?*+()[]{}"
+    out := ""
+    Loop Parse text {
+        ch := A_LoopField
+        if (InStr(special, ch))
+            out .= "\" . ch
+        else
+            out .= ch
+    }
+    return out
 }
 
 WP_RemoveWindowFromPillBlacklist(hwnd) {

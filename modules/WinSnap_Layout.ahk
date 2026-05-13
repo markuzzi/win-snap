@@ -688,7 +688,36 @@ IsPillBlacklisted(className, title := "") {
         return true
     if (className && title && PillBlackList.Has("class:" . className . "|title:" . title))
         return true
+    if (title) {
+        titleRegexPrefix := "titleRegex:"
+        comboRegexPrefix := className ? "class:" . className . "|titleRegex:" : ""
+        for key, flag in PillBlackList {
+            if (!flag)
+                continue
+            if (InStr(key, titleRegexPrefix) = 1) {
+                pattern := SubStr(key, StrLen(titleRegexPrefix) + 1)
+                if (PillBlackList_TitleRegexMatches(pattern, title, key))
+                    return true
+            } else if (comboRegexPrefix && InStr(key, comboRegexPrefix) = 1) {
+                pattern := SubStr(key, StrLen(comboRegexPrefix) + 1)
+                if (PillBlackList_TitleRegexMatches(pattern, title, key))
+                    return true
+            }
+        }
+    }
     return false
+}
+
+PillBlackList_TitleRegexMatches(pattern, title, key := "") {
+    if (pattern = "" || title = "")
+        return false
+    try {
+        return !!RegExMatch(title, pattern)
+    } catch Error as e {
+        label := key ? key : pattern
+        LogException(e, "PillBlackList_TitleRegexMatches: invalid regex " . label)
+        return false
+    }
 }
 
 
