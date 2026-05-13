@@ -1065,16 +1065,7 @@ WP_OnPillContextMenu(targetHwnd) {
         label := label . " (" . info.className . ")"
 
     m := Menu()
-    isBlack := IsBlacklistedExe(info.exe, info.className)
-    if (isBlack) {
-        m.Add("Aus AutoSnap-Blacklist entfernen", (*) => WP_RemoveWindowFromBlacklist(targetHwnd))
-        m.Add("Zu AutoSnap-Blacklist hinzufuegen", (*) => 0)
-        m.Disable("Zu AutoSnap-Blacklist hinzufuegen")
-    } else {
-        m.Add("Zu AutoSnap-Blacklist hinzufuegen", (*) => WP_AddWindowToBlacklist(targetHwnd))
-        m.Add("Aus AutoSnap-Blacklist entfernen", (*) => 0)
-        m.Disable("Aus AutoSnap-Blacklist entfernen")
-    }
+    BlackList_AddMenuItems(m, targetHwnd)
 
     m.Add()
 
@@ -1165,22 +1156,8 @@ WP_GetWindowIdentity(hwnd) {
     return { exe:exe, className:className, title:title }
 }
 
-WP_AddWindowToBlacklist(hwnd) {
-    global AutoSnapBlackList
-    info := WP_GetWindowIdentity(hwnd)
-    if (!info)
-        return
-    if (!IsSet(AutoSnapBlackList) || !(AutoSnapBlackList is Map))
-        AutoSnapBlackList := Map()
-    comboKey := "exe:" . StrLower(info.exe) . "|class:" . info.className
-    if (AutoSnapBlackList.Has(comboKey)) {
-        ShowTrayTip("Bereits auf AutoSnap-Blacklist: " . info.exe . " (" . info.className . ")", 1500)
-        return
-    }
-    AutoSnapBlackList[comboKey] := true
-    try BlackList_Save()
-    ShowTrayTip("AutoSnap Blacklist hinzugefuegt: " . info.exe . " (" . info.className . ")", 1500)
-    LogInfo(Format("WP_AddWindowToBlacklist: added exe={}, class={}", info.exe, info.className))
+WP_AddWindowToBlacklist(hwnd, mode := "processClass") {
+    BlackList_AddWindowRuleByHwnd(hwnd, mode)
 }
 
 WP_AddWindowToPillBlacklist(hwnd, mode) {
@@ -1299,29 +1276,7 @@ WP_RemoveWindowFromPillBlacklist(hwnd) {
 }
 
 WP_RemoveWindowFromBlacklist(hwnd) {
-    global AutoSnapBlackList
-    info := WP_GetWindowIdentity(hwnd)
-    if (!info)
-        return
-    if (!IsSet(AutoSnapBlackList) || !(AutoSnapBlackList is Map))
-        AutoSnapBlackList := Map()
-    exeKey := "exe:" . StrLower(info.exe)
-    classKey := "class:" . info.className
-    comboKey := exeKey . "|" . classKey
-    changed := false
-    if (AutoSnapBlackList.Has(comboKey))
-        AutoSnapBlackList.Delete(comboKey), changed := true
-    if (AutoSnapBlackList.Has(exeKey))
-        AutoSnapBlackList.Delete(exeKey), changed := true
-    if (AutoSnapBlackList.Has(classKey))
-        AutoSnapBlackList.Delete(classKey), changed := true
-    if (!changed) {
-        ShowTrayTip("Nicht auf AutoSnap-Blacklist: " . info.exe . " (" . info.className . ")", 1500)
-        return
-    }
-    try BlackList_Save()
-    ShowTrayTip("AutoSnap Blacklist entfernt: " . info.exe . " (" . info.className . ")", 1500)
-    LogInfo(Format("WP_RemoveWindowFromBlacklist: removed exe={}, class={}", info.exe, info.className))
+    BlackList_RemoveWindowRulesByHwnd(hwnd)
 }
 
 WP_RefreshActiveStyles() {

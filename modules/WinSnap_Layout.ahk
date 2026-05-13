@@ -597,9 +597,9 @@ BlackList_Save() {
     if (!IsSet(AutoSnapBlackList) || !(AutoSnapBlackList is Map))
         AutoSnapBlackList := Map()
     data := Map()
-    for exe, flag in AutoSnapBlackList {
+    for key, flag in AutoSnapBlackList {
         if (flag)
-            data[exe] := true
+            data[key] := true
     }
     try {
         f := FileOpen(path, "w", "UTF-8")
@@ -613,17 +613,291 @@ BlackList_Save() {
     LogInfo(Format("BlackList_Save: saved to {}", path))
 }
 
-; Bestimmt, ob eine EXE/Klasse-Kombination vom AutoSnap ausgeschlossen ist.
-; Es wird nur gematcht, wenn sowohl exe als auch className vorhanden sind.
-IsBlacklistedExe(exe, className := "") {
+BlackList_Ensure() {
     global AutoSnapBlackList
     if (!IsSet(AutoSnapBlackList) || !(AutoSnapBlackList is Map))
         AutoSnapBlackList := Map()
-    ; Nur Kombinationen zählen: beide müssen gesetzt sein.
-    if (!exe || !className)
+}
+
+BlackList_GetWindowIdentity(hwnd) {
+    if (!hwnd)
+        return 0
+    if (!DllCall("IsWindow", "ptr", hwnd) || !WinExist("ahk_id " hwnd))
+        return 0
+    try {
+        exe := WinGetProcessName("ahk_id " hwnd)
+    } catch {
+        exe := ""
+    }
+    try {
+        className := WinGetClass("ahk_id " hwnd)
+    } catch {
+        className := ""
+    }
+    try {
+        title := WinGetTitle("ahk_id " hwnd)
+    } catch {
+        title := ""
+    }
+    if (!exe && !className && !title)
+        return 0
+    return { exe:exe, className:className, title:title }
+}
+
+BlackList_FormatWindowLabel(exe := "", className := "", title := "") {
+    label := exe ? exe : ""
+    if (className)
+        label := label ? label . " (" . className . ")" : className
+    if (!label && title)
+        label := title
+    return label
+}
+
+BlackList_GetExactCandidateKeys(exe := "", className := "", title := "") {
+    keys := []
+    exeKey := exe ? "exe:" . StrLower(exe) : ""
+    classKey := className ? "class:" . className : ""
+    titleKey := title ? "title:" . title : ""
+    if (exeKey && className)
+        keys.Push(exeKey . "|class:" . className)
+    if (className)
+        keys.Push(classKey)
+    if (title)
+        keys.Push(titleKey)
+    if (className && title)
+        keys.Push(classKey . "|title:" . title)
+    return keys
+}
+
+BlackList_GetMatchingKeys(exe := "", className := "", title := "") {
+    global AutoSnapBlackList
+    BlackList_Ensure()
+    matches := []
+    seen := Map()
+    for key in BlackList_GetExactCandidateKeys(exe, className, title) {
+        if (AutoSnapBlackList.Has(key) && !seen.Has(key)) {
+            matches.Push(key)
+            seen[key] := true
+        }
+    }
+    if (title) {
+        titleRegexPrefix := "titleRegex:"
+        comboRegexPrefix := className ? "class:" . className . "|titleRegex:" : ""
+        for key, flag in AutoSnapBlackList {
+            if (!flag || seen.Has(key))
+                continue
+            if (InStr(key, titleRegexPrefix) = 1) {
+                pattern := SubStr(key, StrLen(titleRegexPrefix) + 1)
+                if (BlackList_TitleRegexMatches(pattern, title, key)) {
+                    matches.Push(key)
+                    seen[key] := true
+                }
+            } else if (comboRegexPrefix && InStr(key, comboRegexPrefix) = 1) {
+                pattern := SubStr(key, StrLen(comboRegexPrefix) + 1)
+                if (BlackList_TitleRegexMatches(pattern, title, key)) {
+                    matches.Push(key)
+                    seen[key] := true
+                }
+            }
+        }
+    }
+    return matches
+}
+
+; Bestimmt, ob ein Fenster vom AutoSnap ausgeschlossen ist.
+; Unterstuetzte Keys: exe+class, class, title, class+title sowie titleRegex und class+titleRegex.
+IsBlacklistedExe(exe, className := "", title := "") {
+    return BlackList_GetMatchingKeys(exe, className, title).Length > 0
+}
+
+BlackList_TitleRegexMatches(pattern, title, key := "") {
+    if (pattern = "" || title = "")
         return false
-    key := "exe:" . StrLower(exe) . "|class:" . className
-    return AutoSnapBlackList.Has(key)
+    try {
+        return !!RegExMatch(title, pattern)
+    } catch Error as e {
+        label := key ? key : pattern
+        LogException(e, "BlackList_TitleRegexMatches: invalid regex " . label)
+        return false
+    }
+}
+
+BlackList_EscapeRegex(text) {
+    special := "\.^$|?*+()[]{}"
+    out := ""
+    Loop Parse text {
+        ch := A_LoopField
+        if (InStr(special, ch))
+            out .= "\" . ch
+        else
+            out .= ch
+    }
+    return out
+}
+
+BlackList_RequestTitleRegex(title) {
+    defaultPattern := "^" . BlackList_EscapeRegex(title) . "$"
+    try {
+        ib := InputBox("RegEx fuer den Fenstertitel:", "AutoSnap-Blacklist", "w520 h140", defaultPattern)
+    } catch Error as e {
+        LogException(e, "BlackList_RequestTitleRegex: InputBox failed")
+        return ""
+    }
+    if (ib.Result != "OK")
+        return ""
+    pattern := Trim(ib.Value)
+    if (pattern = "") {
+        ShowTrayTip("Leerer RegEx - nicht hinzugefuegt", 1500)
+        return ""
+    }
+    try {
+        RegExMatch(title, pattern)
+    } catch Error as e {
+        MsgBox("Ungueltiger RegEx:`n" . pattern, "AutoSnap-Blacklist")
+        LogException(e, "BlackList_RequestTitleRegex: invalid regex")
+        return ""
+    }
+    return pattern
+}
+
+BlackList_AddWindowRule(exe := "", className := "", title := "", mode := "processClass") {
+    global AutoSnapBlackList
+    BlackList_Ensure()
+
+    if (mode = "processClass") {
+        if (!exe || !className) {
+            ShowTrayTip("Prozess oder Fensterklasse fehlt", 1500)
+            return 0
+        }
+        key := "exe:" . StrLower(exe) . "|class:" . className
+        label := BlackList_FormatWindowLabel(exe, className, title)
+        modeLabel := "Prozess+Klasse"
+    } else if (mode = "class") {
+        if (!className) {
+            ShowTrayTip("Keine Fensterklasse vorhanden", 1500)
+            return 0
+        }
+        key := "class:" . className
+        label := className
+        modeLabel := "Klasse"
+    } else if (mode = "title") {
+        if (!title) {
+            ShowTrayTip("Kein Fenstertitel vorhanden", 1500)
+            return 0
+        }
+        pattern := BlackList_RequestTitleRegex(title)
+        if (pattern = "")
+            return 0
+        key := "titleRegex:" . pattern
+        label := pattern
+        modeLabel := "Titel-RegEx"
+    } else if (mode = "classTitle") {
+        if (!className) {
+            ShowTrayTip("Keine Fensterklasse vorhanden", 1500)
+            return 0
+        }
+        if (!title) {
+            ShowTrayTip("Kein Fenstertitel vorhanden", 1500)
+            return 0
+        }
+        pattern := BlackList_RequestTitleRegex(title)
+        if (pattern = "")
+            return 0
+        key := "class:" . className . "|titleRegex:" . pattern
+        label := className . " + " . pattern
+        modeLabel := "Klasse+Titel-RegEx"
+    } else {
+        ShowTrayTip("Unbekannter Blacklist-Modus", 1500)
+        return 0
+    }
+
+    already := AutoSnapBlackList.Has(key)
+    if (!already) {
+        AutoSnapBlackList[key] := true
+        try BlackList_Save()
+    }
+    return { key:key, label:label, mode:mode, modeLabel:modeLabel, already:already }
+}
+
+BlackList_AddWindowRuleByHwnd(hwnd, mode := "processClass") {
+    info := BlackList_GetWindowIdentity(hwnd)
+    if (!info)
+        return
+    result := BlackList_AddWindowRule(info.exe, info.className, info.title, mode)
+    if (!result)
+        return
+    if (result.already) {
+        ShowTrayTip("Bereits auf AutoSnap-Blacklist: " . result.label, 1500)
+        LogInfo(Format("BlackList_AddWindowRuleByHwnd: already key={}", result.key))
+    } else {
+        ShowTrayTip("AutoSnap Blacklist hinzugefuegt (" . result.modeLabel . "): " . result.label, 1500)
+        LogInfo(Format("BlackList_AddWindowRuleByHwnd: added key={}", result.key))
+    }
+}
+
+BlackList_RemoveMatchingRules(exe := "", className := "", title := "") {
+    global AutoSnapBlackList
+    BlackList_Ensure()
+    matches := BlackList_GetMatchingKeys(exe, className, title)
+    for key in matches {
+        if (AutoSnapBlackList.Has(key))
+            AutoSnapBlackList.Delete(key)
+    }
+    if (matches.Length)
+        try BlackList_Save()
+    return matches.Length
+}
+
+BlackList_RemoveWindowRulesByHwnd(hwnd) {
+    info := BlackList_GetWindowIdentity(hwnd)
+    if (!info)
+        return
+    removed := BlackList_RemoveMatchingRules(info.exe, info.className, info.title)
+    label := BlackList_FormatWindowLabel(info.exe, info.className, info.title)
+    if (!removed) {
+        ShowTrayTip("Nicht auf AutoSnap-Blacklist: " . label, 1500)
+        return
+    }
+    ShowTrayTip("AutoSnap Blacklist entfernt (" . removed . "): " . label, 1500)
+    LogInfo(Format("BlackList_RemoveWindowRulesByHwnd: removed {} rules for exe={}, class={}, title={}", removed, info.exe, info.className, info.title))
+}
+
+BlackList_AddDisabledMenuItem(m, label) {
+    m.Add(label, (*) => 0)
+    m.Disable(label)
+}
+
+BlackList_AddMenuItems(m, hwnd) {
+    info := BlackList_GetWindowIdentity(hwnd)
+    if (!info)
+        return false
+    if (IsBlacklistedExe(info.exe, info.className, info.title)) {
+        m.Add("Aus AutoSnap-Blacklist entfernen", (*) => BlackList_RemoveWindowRulesByHwnd(hwnd))
+    } else {
+        BlackList_AddDisabledMenuItem(m, "Aus AutoSnap-Blacklist entfernen")
+    }
+
+    if (info.exe && info.className)
+        m.Add("Zu AutoSnap-Blacklist hinzufuegen (Prozess+Klasse)", (*) => BlackList_AddWindowRuleByHwnd(hwnd, "processClass"))
+    else
+        BlackList_AddDisabledMenuItem(m, "Zu AutoSnap-Blacklist hinzufuegen (Prozess+Klasse)")
+
+    if (info.className)
+        m.Add("Zu AutoSnap-Blacklist hinzufuegen (Klasse)", (*) => BlackList_AddWindowRuleByHwnd(hwnd, "class"))
+    else
+        BlackList_AddDisabledMenuItem(m, "Zu AutoSnap-Blacklist hinzufuegen (Klasse)")
+
+    if (info.title) {
+        m.Add("Zu AutoSnap-Blacklist hinzufuegen (Titel-RegEx)", (*) => BlackList_AddWindowRuleByHwnd(hwnd, "title"))
+        if (info.className)
+            m.Add("Zu AutoSnap-Blacklist hinzufuegen (Klasse+Titel-RegEx)", (*) => BlackList_AddWindowRuleByHwnd(hwnd, "classTitle"))
+        else
+            BlackList_AddDisabledMenuItem(m, "Zu AutoSnap-Blacklist hinzufuegen (Klasse+Titel-RegEx)")
+    } else {
+        BlackList_AddDisabledMenuItem(m, "Zu AutoSnap-Blacklist hinzufuegen (Titel-RegEx)")
+        BlackList_AddDisabledMenuItem(m, "Zu AutoSnap-Blacklist hinzufuegen (Klasse+Titel-RegEx)")
+    }
+    return true
 }
 
 
@@ -878,7 +1152,12 @@ AutoSnap_NewlyStartedWindows() {
         } catch {
             className := ""
         }
-        if ((exe || className) && IsBlacklistedExe(exe, className))
+        try {
+            title := WinGetTitle("ahk_id " hwnd)
+        } catch {
+            title := ""
+        }
+        if ((exe || className || title) && IsBlacklistedExe(exe, className, title))
             continue
 
         ; Bereits einem Leaf zugeordnet? -> sicherstellen, dass es in seinem Leaf liegt.

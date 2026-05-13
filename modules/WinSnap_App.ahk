@@ -279,60 +279,28 @@ ShellMessage_Handler(wParam, lParam, msg, hwnd) {
     return 0
 }
 
-; Toggle: aktives Fenster auf AutoSnap-Blacklist setzen oder wieder entfernen.
+; Menue: aktives Fenster auf AutoSnap-Blacklist setzen oder wieder entfernen.
 ToggleBlacklistForActiveWindow() {
-    global AutoSnapBlackList
     win := GetActiveWindow()
     if (!win)
         return
     hwnd := win.hwnd
 
-    try {
-        exe := WinGetProcessName("ahk_id " hwnd)
-    } catch {
-        exe := ""
-    }
-    try {
-        className := WinGetClass("ahk_id " hwnd)
-    } catch {
-        className := ""
-    }
-    if (!exe && !className)
+    info := BlackList_GetWindowIdentity(hwnd)
+    if (!info)
         return
 
-    if (!IsSet(AutoSnapBlackList) || !(AutoSnapBlackList is Map))
-        AutoSnapBlackList := Map()
-
-    exeKey := exe ? "exe:" . StrLower(exe) : ""
-    classKey := className ? "class:" . className : ""
-    comboKey := (exeKey && classKey) ? exeKey . "|class:" . className : ""
-
-    ; Kombination exe+class ist ma�Ygeblich; alte Einzel-Keys werden nur zum Aufr��umen berǬcksichtigt.
-    isBlack := false
-    if (comboKey && AutoSnapBlackList.Has(comboKey))
-        isBlack := true
-    if (!isBlack && exeKey && AutoSnapBlackList.Has(exeKey))
-        isBlack := true
-    if (!isBlack && classKey && AutoSnapBlackList.Has(classKey))
-        isBlack := true
-
-    if (isBlack) {
-        if (comboKey && AutoSnapBlackList.Has(comboKey))
-            AutoSnapBlackList.Delete(comboKey)
-        if (exeKey && AutoSnapBlackList.Has(exeKey))
-            AutoSnapBlackList.Delete(exeKey)
-        if (classKey && AutoSnapBlackList.Has(classKey))
-            AutoSnapBlackList.Delete(classKey)
-        try BlackList_Save()
-        ShowTrayTip("AutoSnap Blacklist entfernt: " . exe " (" . className . ")", 1500)
-        MsgBox("AutoSnap Blacklist-Eintrag entfernt: " . exe " (" . className . ")")
-        LogInfo(Format("ToggleBlacklistForActiveWindow: removed exe={}, class={}", exe, className))
-    } else {
-        if (comboKey)
-            AutoSnapBlackList[comboKey] := true
-        try BlackList_Save()
-        ShowTrayTip("AutoSnap Blacklist hinzugefuegt: " . exe " (" . className . ")", 1500)
-        MsgBox("AutoSnap Blacklist-Eintrag hinzugefuegt: " . exe " (" . className . ")")
-        LogInfo(Format("ToggleBlacklistForActiveWindow: added exe={}, class={}", exe, className))
+    m := Menu()
+    if (!BlackList_AddMenuItems(m, hwnd))
+        return
+    m.Add()
+    label := BlackList_FormatWindowLabel(info.exe, info.className, info.title)
+    m.Add("Info: " . label, (*) => 0)
+    m.Disable("Info: " . label)
+    try {
+        m.Show()
+    }
+    catch Error as e {
+        LogException(e, "ToggleBlacklistForActiveWindow: menu.Show failed")
     }
 }

@@ -27,7 +27,7 @@ global AppState := {
     WinToLeaf: Map(),             ; hwnd -> {mon: idx, leaf: id}
     MaximizeRestoreState: Map(),  ; hwnd -> {snapped:bool, mon:idx, leaf:id}
     LeafWindows: Map(),           ; (mon:leaf) -> [hwnd,...]
-    AutoSnapBlackList: Map(),     ; exe/class -> true
+    AutoSnapBlackList: Map(),     ; process/class/title rules -> true
     PillBlackList: Map(),         ; class:/title: -> true
     ; Layout pro Monitor:
     ; Layouts[mon] = { root: id, next: id, nodes: Map() }

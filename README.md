@@ -53,7 +53,7 @@ Legend: `#` = Win, `!` = Alt, `^` = Ctrl, `+` = Shift
 - `^!r`: Reload script
 - `^!/?`: Toggle hotkey overlay while held (vkBF)
 - `^!w`: Toggle window pills overlay
-- `^!b`: Toggle AutoSnap blacklist for the active window (by process)
+- `^!b`: Open AutoSnap blacklist menu for the active window (process+class, class, title RegEx, class+title RegEx)
 - `^!p`: Pause/resume hotkeys and timers
 - `^!q`: Quit script
 
@@ -89,6 +89,7 @@ Adjust these to taste and reload the script (`^!r`).
 ## Persistence and Logs
 
 - Layouts persist in `WinSnap_layouts.json` in the repo folder. Delete that file to reset layouts.
+- AutoSnap blacklist rules persist in `WinSnap_BlackList.json`.
 - Logs go to `WinSnap.log` (ignored by git). You can turn logging off via `LoggingEnabled := false`.
 
 ## Run at Startup (optional)
