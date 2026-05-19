@@ -303,6 +303,40 @@ Layout_LeavesUnder(mon, id) {
     return arr
 }
 
+; Liefert Leaf-Ids in Baumreihenfolge (a vor b). Nur Leaves werden nummeriert.
+Layout_LeafOrder(mon, nodeId := 0) {
+    global Layouts
+    Layout_Ensure(mon)
+    out := []
+    if (!Layouts.Has(mon))
+        return out
+    if (!nodeId)
+        nodeId := Layouts[mon].root
+    visited := Map()
+    Layout_CollectLeavesInOrder(mon, nodeId, out, visited)
+    return out
+}
+
+; Rekursiver Helfer fuer Layout_LeafOrder().
+Layout_CollectLeavesInOrder(mon, nodeId, out, visited) {
+    global Layouts
+    if (!Layouts.Has(mon))
+        return
+    nodes := Layouts[mon].nodes
+    if (!nodes.Has(nodeId) || visited.Has(nodeId))
+        return
+    visited[nodeId] := true
+    n := nodes[nodeId]
+    if (n.split = "") {
+        out.Push(nodeId)
+        return
+    }
+    if (n.a)
+        Layout_CollectLeavesInOrder(mon, n.a, out, visited)
+    if (n.b)
+        Layout_CollectLeavesInOrder(mon, n.b, out, visited)
+}
+
 ; Prueft, ob needle ein Nachfahre von rootId ist.
 IsDescendant(mon, needle, rootId) {
     global Layouts

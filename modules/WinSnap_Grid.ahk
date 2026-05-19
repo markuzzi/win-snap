@@ -20,6 +20,39 @@ MoveWindowIntoLeaf(hwnd, ctx) {
     SnapToLeaf(hwnd, ctx.mon, ctx.leaf)
 }
 
+; Liefert die SnapArea zur sichtbaren Overlay-Nummer (Alt+Shift+O).
+GetNumberedSnapArea(areaNo) {
+    if (areaNo < 1)
+        return 0
+    idx := 1
+    count := MonitorGetCount()
+    Loop count {
+        mon := A_Index
+        Layout_Ensure(mon)
+        for leafId in Layout_LeafOrder(mon) {
+            if (idx = areaNo)
+                return { mon:mon, leaf:leafId }
+            idx += 1
+        }
+    }
+    return 0
+}
+
+; Verschiebt das aktive Fenster in die SnapArea mit der sichtbaren Overlay-Nummer.
+SnapActiveWindowToNumberedArea(areaNo) {
+    win := GetActiveWindow()
+    if (!win)
+        return
+    target := GetNumberedSnapArea(areaNo)
+    if (!target) {
+        ShowTrayTip(Format("Snap-Area {} nicht vorhanden", areaNo), 1200)
+        LogInfo(Format("SnapActiveWindowToNumberedArea: area {} not found", areaNo))
+        return
+    }
+    MoveWindowIntoLeaf(win.hwnd, target)
+    LogInfo(Format("SnapActiveWindowToNumberedArea: hwnd={} -> area {}, mon={}, leaf={}", win.hwnd, areaNo, target.mon, target.leaf))
+}
+
 ; Merkt die aktuelle Fensterposition zur spaeteren Wiederherstellung.
 EnsureHistory(hwnd) {
     global WinHistory
@@ -578,16 +611,19 @@ ShowAllSnapAreasHotkey() {
         Layout_Ensure(mon)
     }
     arr := []
+    labels := []
+    areaNo := 1
     Loop count {
         mon := A_Index
-        rects := Layout_AllLeafRects(mon)
-        for id, _ in rects {
+        for id in Layout_LeafOrder(mon) {
             r := GetLeafRectPx(mon, id)
             arr.Push(r)
+            labels.Push(String(areaNo))
+            areaNo += 1
         }
     }
     if (arr.Length)
-        ShowRectOverlay(arr, overlayColor, overlayDuration)
+        ShowRectOverlay(arr, overlayColor, overlayDuration, labels)
 }
 
 

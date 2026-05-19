@@ -227,6 +227,28 @@ Esc:: {
 #^Up::   GridMove("up")
 #^Down:: GridMove("down")
 
+; Win+Ctrl+<Zahl>: aktives Fenster in nummerierte Snap-Area verschieben
+#^1::SnapActiveWindowToNumberedArea(1)
+#^2::SnapActiveWindowToNumberedArea(2)
+#^3::SnapActiveWindowToNumberedArea(3)
+#^4::SnapActiveWindowToNumberedArea(4)
+#^5::SnapActiveWindowToNumberedArea(5)
+#^6::SnapActiveWindowToNumberedArea(6)
+#^7::SnapActiveWindowToNumberedArea(7)
+#^8::SnapActiveWindowToNumberedArea(8)
+#^9::SnapActiveWindowToNumberedArea(9)
+#^0::SnapActiveWindowToNumberedArea(10)
+#^Numpad1::SnapActiveWindowToNumberedArea(1)
+#^Numpad2::SnapActiveWindowToNumberedArea(2)
+#^Numpad3::SnapActiveWindowToNumberedArea(3)
+#^Numpad4::SnapActiveWindowToNumberedArea(4)
+#^Numpad5::SnapActiveWindowToNumberedArea(5)
+#^Numpad6::SnapActiveWindowToNumberedArea(6)
+#^Numpad7::SnapActiveWindowToNumberedArea(7)
+#^Numpad8::SnapActiveWindowToNumberedArea(8)
+#^Numpad9::SnapActiveWindowToNumberedArea(9)
+#^Numpad0::SnapActiveWindowToNumberedArea(10)
+
 ; Win+Shift+Up: maximieren + Pills hinter das Fenster legen
 #+Up:: {
     global MaximizeRestoreState, WinToLeaf

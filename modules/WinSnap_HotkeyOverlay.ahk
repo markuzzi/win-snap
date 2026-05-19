@@ -38,6 +38,7 @@ HotkeyOverlay_BuildText() {
     lines := []
     lines.Push("Win+Left/Right/Up/Down         – Fenster in Grid bewegen")
     lines.Push("Win+Ctrl+Up/Down               – Vertikal bewegen (Legacy)")
+    lines.Push("Win+Ctrl+1..9 / 0              - Fenster in nummerierte Snap-Area")
     lines.Push("Win+Shift+Up                   - Maximieren (Pills nach hinten)")
     lines.Push("Win+Shift+Down                 - Restore (zur alten Snap-Area)")
     lines.Push("Alt+Left/Right/Up/Down         – Snap-Area wechseln")

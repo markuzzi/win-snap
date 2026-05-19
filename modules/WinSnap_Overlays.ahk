@@ -36,7 +36,7 @@ OverlayClear() {
 }
 
 ; Fuegt ein abgerundetes, transparentes Rechteck-Overlay hinzu.
-OverlayAddRect(rect, color, thickness := 0) {
+OverlayAddRect(rect, color, thickness := 0, label := "") {
     global SnapOverlay
     OverlayEnsure()
 
@@ -76,7 +76,12 @@ OverlayAddRect(rect, color, thickness := 0) {
         style := "+AlwaysOnTop -Caption +ToolWindow +E0x80020 -DPIScale"
         g := Gui(style)
         g.BackColor := color
-        g.Show("NA")  ; NoActivate
+        if (label != "") {
+            fontSize := OverlayLabelFontSize(w, h, label)
+            g.SetFont(Format("s{} Bold cWhite", fontSize), "Segoe UI")
+            g.AddText(Format("x0 y0 w{} h{} Center +0x200 BackgroundTrans", w, h), label)
+        }
+        g.Show(Format("NA x{} y{} w{} h{}", x, y, w, h))  ; NoActivate
         WinSetTransparent(opacity, g)
 
         ; --- Rounded Region erstellen ---
@@ -97,7 +102,7 @@ OverlayAddRect(rect, color, thickness := 0) {
 
         g.Move(x, y, w, h)
         SnapOverlay.edges.Push(g)
-        LogDebug(Format("OverlayAddRect: success (x={}, y={}, w={}, h={}, color={}, opacity={}, radius={})", x, y, w, h, color, opacity, radius))
+        LogDebug(Format("OverlayAddRect: success (x={}, y={}, w={}, h={}, color={}, opacity={}, radius={}, label={})", x, y, w, h, color, opacity, radius, label))
 
     } catch Error as e {
         LogError("OverlayAddRect: Exception occurred → " . e.Message)
@@ -110,16 +115,27 @@ OverlayAddRect(rect, color, thickness := 0) {
     }
 }
 
-
-
+; Berechnet eine gut sichtbare Label-Schriftgroesse fuer ein Overlay-Rechteck.
+OverlayLabelFontSize(w, h, label) {
+    digits := Max(1, StrLen(String(label)))
+    heightLimit := Floor(h * 0.38)
+    widthLimit := Floor((w * 0.70) / (digits * 0.60))
+    size := Min(96, heightLimit, widthLimit)
+    return Max(18, size)
+}
 
 ; Zeigt mehrere Rechtecke als Overlay fuer eine Dauer (0 = persistent).
-ShowRectOverlay(rectArray, color, duration := 0) {
+ShowRectOverlay(rectArray, color, duration := 0, labelArray := 0) {
     OverlayClear()
 
+    idx := 0
     for rect in rectArray {
+        idx += 1
+        label := ""
+        if (IsObject(labelArray) && labelArray.Length >= idx)
+            label := labelArray[idx]
         try {
-            OverlayAddRect(rect, color)
+            OverlayAddRect(rect, color, 0, label)
         }
         catch Error as e {
             LogError("ShowRectOverlay: OverlayAddRect failed")
@@ -157,15 +173,18 @@ ShowAllSnapAreasForMonitor(mon) {
     overlayColor := StateGet("OverlayColor", "Navy")
     overlayDuration := StateGet("OverlayDuration", 1200)
     Layout_Ensure(mon)
-    rects := Layout_AllLeafRects(mon)
     arr := []
-    for id, _ in rects {
+    labels := []
+    idx := 1
+    for id in Layout_LeafOrder(mon) {
         r := GetLeafRectPx(mon, id)
         arr.Push(r)
+        labels.Push(String(idx))
+        idx += 1
     }
     if (arr.Length = 0)
         return
-    ShowRectOverlay(arr, overlayColor, overlayDuration)
+    ShowRectOverlay(arr, overlayColor, overlayDuration, labels)
     LogInfo(Format("ShowAllSnapAreasForMonitor: mon={}, count={}", mon, arr.Length))
 }
 
