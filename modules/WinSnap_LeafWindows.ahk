@@ -61,19 +61,38 @@ SnappedWindows_RestoreFromStatus() {
 
     ; Pass 1: exact hwnd restore (with identity verification).
     for entry in entries {
-        mon := SW_ToInt(SW_GetEntryValue(entry, "mon", 0), 0)
         leaf := SW_ToInt(SW_GetEntryValue(entry, "leaf", 0), 0)
-        if (!mon || !leaf)
-            continue
-        Layout_Ensure(mon)
-        if (!Layouts.Has(mon) || !Layouts[mon].nodes.Has(leaf))
-            continue
-
+        monKey := SW_GetEntryValue(entry, "monKey", "")
         rawHwnd := SW_GetEntryValue(entry, "hwnd", 0)
         hwnd := SW_ToInt(rawHwnd, 0)
         proc := SW_GetEntryValue(entry, "process", "")
         className := SW_GetEntryValue(entry, "class", "")
         title := SW_GetEntryValue(entry, "title", "")
+
+        ; Monitor bevorzugt ueber stabilen Key aufloesen; der Index ist nur Fallback
+        ; fuer Status-Dateien aus aelteren Versionen.
+        mon := 0
+        if (monKey != "") {
+            mon := Monitors_IndexFromKey(monKey)
+            if (!mon) {
+                ; Monitor aktuell nicht angeschlossen: Zuordnung merken, damit das
+                ; Fenster beim Wiederanstecken zurueckwandern kann.
+                if (hwnd && leaf) {
+                    global MonitorsDisplaced
+                    MonitorsDisplaced[hwnd] := { key:monKey, leaf:leaf }
+                }
+                continue
+            }
+        } else {
+            mon := SW_ToInt(SW_GetEntryValue(entry, "mon", 0), 0)
+            if (!Monitors_IsValid(mon))
+                continue
+        }
+        if (!mon || !leaf)
+            continue
+        Layout_Ensure(mon)
+        if (!Layouts.Has(mon) || !Layouts[mon].nodes.Has(leaf))
+            continue
 
         if (hwnd && !used.Has(hwnd)) {
             valid := false
@@ -348,8 +367,32 @@ SnappedWindows_WriteStatus() {
             row["class"] := className
             row["title"] := title
             row["mon"] := info.mon
+            row["monKey"] := Monitors_KeyFromIndex(info.mon)
             row["leaf"] := info.leaf
             data.Push(row)
+        }
+        ; Fenster, deren Monitor gerade nicht angeschlossen ist, mit ihrem alten
+        ; Ziel mitschreiben (werden beim Wiederanstecken zurueckgeholt).
+        try {
+            global MonitorsDisplaced
+            for hwnd, st in MonitorsDisplaced {
+                if (WinToLeaf.Has(hwnd))
+                    continue
+                valid := false
+                try valid := DllCall("IsWindow", "ptr", hwnd) && WinExist("ahk_id " hwnd)
+                if (!valid)
+                    continue
+                row := Map()
+                row["hwnd"] := hwnd
+                try row["process"] := WinGetProcessName("ahk_id " hwnd)
+                try row["class"] := WinGetClass("ahk_id " hwnd)
+                try row["title"] := WinGetTitle("ahk_id " hwnd)
+                row["mon"] := 0
+                row["monKey"] := st.key
+                row["leaf"] := st.leaf
+                row["displaced"] := true
+                data.Push(row)
+            }
         }
         f := FileOpen(statusPath, "w", "UTF-8")
         if (f) {

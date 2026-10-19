@@ -63,7 +63,8 @@ global AppState := {
     SnappedWindowsWritePending: false,
     LayoutSavePending: false,
     LayoutSaveDelayMs: 500,
-    SuppressMoveHighlight: false
+    SuppressMoveHighlight: false,
+    DisplayChangePending: false    ; true waehrend ein Monitor-Hotplug verarbeitet wird
 }
 
 ; Kompatibilitaets-Aliase: bestehender Modulcode kann weiter mit den bisherigen
@@ -159,6 +160,7 @@ StateToggle(key, default := false) {
 ; =========================
 #Include ".\modules\_JXON.ahk"
 #Include ".\modules\WinSnap_Utils.ahk"
+#Include ".\modules\WinSnap_Monitors.ahk"      ; Stabile Monitor-IDs + Hotplug-Handling
 #Include ".\modules\WinSnap_Layout.ahk"        ; Load layouts BEFORE anything triggers highlights
 #Include ".\modules\WinSnap_LeafWindows.ahk"
 #Include ".\modules\WinSnap_Selection.ahk"

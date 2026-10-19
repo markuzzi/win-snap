@@ -134,7 +134,9 @@ GetLeafNavigationContext() {
         hwnd := win.hwnd
         if (WinToLeaf.Has(hwnd)) {
             info := WinToLeaf[hwnd]
-            return { mon:info.mon, leaf:info.leaf, hwnd:hwnd }
+            ; Veraltete Zuordnung (Monitor abgesteckt) ignorieren -> wie ungesnappt behandeln
+            if (Monitors_IsValid(info.mon))
+                return { mon:info.mon, leaf:info.leaf, hwnd:hwnd }
         }
         monInfo := GetMonitorIndexAndArea(hwnd)
         mon := monInfo.index
@@ -146,12 +148,12 @@ GetLeafNavigationContext() {
             leaf := Layout_FindLeafAtPoint(mon, cx, cy)
         return { mon:mon, leaf:leaf, hwnd:hwnd }
     }
-    if (MonitorGetCount() = 0)
+    if (Monitors_Count() = 0)
         return { mon:1, leaf:0, hwnd:0 }
     mon := 1
     Layout_Ensure(mon)
     leaf := GetSelectedLeaf(mon)
-    if (!leaf)
+    if (!leaf && Layouts.Has(mon))
         leaf := Layouts[mon].root
     return { mon:mon, leaf:leaf, hwnd:0 }
 }

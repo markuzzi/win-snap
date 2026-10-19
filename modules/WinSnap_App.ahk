@@ -5,6 +5,12 @@
 ; Zentrale Startup-Sequenz in definierter Reihenfolge.
 App_Startup() {
     try {
+        Monitors_InitDisplayChangeHook()
+    }
+    catch Error as e {
+        LogException(e, "App_Startup: Monitors_InitDisplayChangeHook failed")
+    }
+    try {
         Layout_LoadAll()
     }
     catch Error as e {

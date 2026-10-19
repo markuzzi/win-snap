@@ -25,31 +25,28 @@ GetActiveWindow() {
 }
 
 ; Bestimmt Monitorindex und Arbeitsbereich des Fensters hwnd.
+; Nutzt MonitorFromWindow (groesste Ueberlappung, sonst naechster Monitor), damit
+; auch Fenster im Taskleistenbereich oder teilweise ausserhalb korrekt zugeordnet werden.
 GetMonitorIndexAndArea(hwnd) {
+    idx := 1
     try {
-        WinGetPos &wx, &wy, &ww, &wh, "ahk_id " hwnd
-    } catch {
-        return { index:1, left:0, top:0, right:A_ScreenWidth, bottom:A_ScreenHeight }
+        idx := Monitors_IndexFromWindow(hwnd)
     }
-    cx := wx + ww / 2
-    cy := wy + wh / 2
-    count := MonitorGetCount()
-    Loop count {
-        MonitorGetWorkArea(A_Index, &L, &T, &R, &B)
-        if (cx >= L && cx < R && cy >= T && cy < B)
-            return { index:A_Index, left:L, top:T, right:R, bottom:B }
+    catch Error as e {
+        idx := 1
     }
-    MonitorGetWorkArea(1, &L, &T, &R, &B)
-    return { index:1, left:L, top:T, right:R, bottom:B }
+    m := GetMonitorWork(idx)
+    return { index:idx, left:m.left, top:m.top, right:m.right, bottom:m.bottom }
 }
 
 ; Liefert den Workarea-Rechteck des angegebenen Monitors.
+; Ungueltige Indizes (z.B. abgesteckter Monitor) fallen auf Monitor 1 zurueck; das
+; ist nur ein Notnagel, Aufrufer sollten vorher Monitors_IsValid() pruefen.
 GetMonitorWork(mon) {
-    count := MonitorGetCount()
-    if (count <= 0)
-        count := 1
-    if (mon < 1 || mon > count)
+    if (!Monitors_IsValid(mon)) {
+        LogDebug(Format("GetMonitorWork: invalid monitor index {} -> fallback 1", mon))
         mon := 1
+    }
     try {
         MonitorGetWorkArea(mon, &L, &T, &R, &B)
     } catch {
@@ -311,14 +308,15 @@ MoveWindow(hwnd, x, y, w, h) {
                 policy := "shrink"
         }
     }
+    ; Cache-Key am ZIEL-Monitor ausrichten (nicht am aktuellen): die EFB-Raender
+    ; haengen von der DPI des Monitors ab, auf dem das Fenster landet.
     monIdx := 0
     try {
-        mi := GetMonitorIndexAndArea(hwnd)
-        monIdx := mi.index
+        monIdx := Monitors_IndexFromPoint(x + w / 2, y + h / 2)
     }
     catch Error as e {
         monIdx := 0
-        DebugLog("GetMonitorIndexAndArea failed in MoveWindow")
+        DebugLog("Monitors_IndexFromPoint failed in MoveWindow")
     }
     cacheKey := className ":" procName ":" monIdx
     DebugLog(Format("MoveWindow start hwnd={}, class={}, proc={}, key={}, policy={}, target=({}, {}, {}, {})", hwnd, className, procName, cacheKey, policy, x, y, w, h))
@@ -429,6 +427,24 @@ MoveWindow(hwnd, x, y, w, h) {
         } else {
             DebugLog("EFB unavailable; skip correction")
         }
+    }
+
+    ; Nachkontrolle: Beim Wechsel auf einen Monitor mit anderer DPI skaliert die App
+    ; ihr Fenster nach WM_DPICHANGED selbst um, oft erst nach unserem Move. Einmal
+    ; nachmessen und bei Abweichung erneut setzen.
+    try {
+        if (!IsSet(x1))
+            x1 := x0, y1 := y0, w1 := w0, h1 := h0
+        Sleep 25
+        WinGetPos &cx, &cy, &cw, &ch, "ahk_id " hwnd
+        if (Abs(cx - x1) > 2 || Abs(cy - y1) > 2 || Abs(cw - w1) > 2 || Abs(ch - h1) > 2) {
+            DebugLog(Format("Post-move check: got ({}, {}, {}, {}) expected ({}, {}, {}, {}) -> re-move", cx, cy, cw, ch, x1, y1, w1, h1))
+            WinMove x1, y1, w1, h1, "ahk_id " hwnd
+            Sleep 10
+        }
+    }
+    catch Error as e {
+        DebugLog("Post-move check failed")
     }
 
     ; Highlight reaktivieren, falls bekanntem Leaf zugeordnet (optional unterdrückt)

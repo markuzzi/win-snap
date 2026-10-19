@@ -186,15 +186,12 @@ DragSnap_Cancel() {
     LogDebug("DragSnap_Cancel: canceled")
 }
 
-; Liefert den Monitorindex, der den Punkt (x,y) enthaelt.
+; Liefert den Monitorindex, der den Punkt (x,y) enthaelt (naechster Monitor als Fallback).
 FindMonitorByPoint(x, y) {
-    count := MonitorGetCount()
-    if (count <= 0)
-        return 1
-    Loop count {
-        MonitorGetWorkArea(A_Index, &L, &T, &R, &B)
-        if (x >= L && x < R && y >= T && y < B)
-            return A_Index
+    try {
+        return Monitors_IndexFromPoint(x, y)
     }
-    return 1
+    catch Error as e {
+        return 1
+    }
 }

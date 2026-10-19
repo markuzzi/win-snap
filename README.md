@@ -13,7 +13,8 @@ The script organizes each monitor into “leaves” (snap areas) that you can sp
 - Window search within the active snap area
 - Drag-move and drag-resize using Alt mouse gestures
 - Quick transparency controls for the active window
-- Persistent layouts stored in `WinSnap_layouts.json`
+- Persistent layouts stored in `WinSnap_layouts.json`, keyed by a stable monitor ID (survives index changes)
+- Multi-monitor hotplug handling: unplugging/replugging monitors re-keys all state, parks the layout of the missing monitor and restores it (including displaced windows) when it returns
 - Logging to `WinSnap.log` for troubleshooting
 
 ## Requirements
@@ -86,6 +87,15 @@ Most defaults live near the top of `WinSnap.ahk` and control split behavior, ove
 
 Adjust these to taste and reload the script (`^!r`).
 
+## Multi-Monitor Behaviour
+
+AutoHotkey addresses monitors by a volatile index (1..N). WinSnap therefore maps each monitor to a stable key (the display device interface ID, falling back to device name + resolution) in `modules/WinSnap_Monitors.ahk`.
+
+- Layouts are persisted per stable key (file format v2: `{"version": 2, "monitors": {"<key>": {...}}}`). Old index-based files are migrated on first load.
+- On `WM_DISPLAYCHANGE` / work-area changes (debounced ~700 ms) all index-based state (layouts, window↔area mapping, selection, pill reserves, frame caches) is re-keyed to the new indices.
+- Layouts of unplugged monitors are parked in memory and in the layout file; they are restored when the monitor returns. Windows that were on the unplugged monitor are assigned to the snap area Windows moved them into, and moved back to their old area when the monitor reappears.
+- Monitor lookup for windows and points uses `MonitorFromWindow` / `MonitorFromPoint`, so windows overlapping the taskbar or partially off-screen resolve to the correct monitor.
+
 ## Persistence and Logs
 
 - Layouts persist in `WinSnap_layouts.json` in the repo folder. Delete that file to reset layouts.
@@ -108,7 +118,7 @@ Using Ahk2Exe (installed with AutoHotkey v2):
 ## Repository Structure
 
 - `WinSnap.ahk` – main entry script
-- `modules/` – modular features (layout, selection, overlays, window search, drag‑resize, pills overlay, utils, and JSON parser `_JXON.ahk`)
+- `modules/` – modular features (layout, monitors/hotplug, selection, overlays, window search, drag‑resize, pills overlay, utils, and JSON parser `_JXON.ahk`)
 - `WinSnap_layouts.json` – persisted layouts (git‑ignored)
 - `WinSnap.log` – log output (git‑ignored)
 

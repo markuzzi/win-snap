@@ -6,6 +6,13 @@ Layout_Ensure(mon) {
     global Layouts
     needsReset := false
     if (!Layouts.Has(mon)) {
+        ; Keine Layouts fuer nicht (mehr) vorhandene Monitore anlegen: sie wuerden
+        ; ueber den GetMonitorWork-Fallback auf Monitor 1 gerendert und dort mit
+        ; dessen echtem Layout kollidieren.
+        if (!Monitors_IsValid(mon)) {
+            LogWarn(Format("Layout_Ensure: monitor {} not connected -> no layout created", mon))
+            return
+        }
         needsReset := true
     } else {
         layout := Layouts[mon]
@@ -464,14 +471,21 @@ Layout_FlushSave(*) {
 }
 
 ; Laedt alle Layouts aus der JSON-Datei oder initialisiert Defaults.
+; Dateiformat v2: { "version": 2, "monitors": { "<stabiler Key>": { name, index, root, next, nodes } } }
+; Altes Format (Top-Level-Keys = Monitorindex) wird beim Laden migriert.
+; Layouts nicht angeschlossener Monitore bleiben in MonitorsOffline erhalten und
+; werden beim naechsten Speichern wieder mitgeschrieben.
 Layout_LoadAll() {
-    global Layouts
+    global Layouts, MonitorsOffline
     path := Layout_GetStoragePath()
-    Layouts := Map()
+    ; Map-Objekt beibehalten (Aliase AppState.Layouts/Layouts zeigen darauf)
+    Layouts.Clear()
+    MonitorsOffline.Clear()
+    Monitors_Refresh(true)
+    monCount := Monitors_Count()
 
     if (!FileExist(path)) {
         ; Wenn keine Datei existiert → Standardlayout für alle Monitore erstellen
-        monCount := MonitorGetCount()
         Loop monCount {
             Layout_Ensure(A_Index)
         }
@@ -495,46 +509,39 @@ Layout_LoadAll() {
         return
     }
 
-    monCount := MonitorGetCount()
-
-    ; Nur Monitore laden, die tatsächlich existieren
-    for mon, layout in data {
-        monIdx := Layout_ToInt(mon, 1)
-        if (monIdx > monCount)
-            continue  ; Monitor existiert nicht mehr
-        nodes := Map()
-        if (IsObject(layout) && layout.Has("nodes")) {
-            for id, node in layout["nodes"] {
-                nid := Layout_ToInt(id, 1)
-                nodes[nid] := {
-                    id: nid,
-                    parent: Layout_ToInt(node.Has("parent") ? node["parent"] : 0, 0),
-                    split: node.Has("split") ? node["split"] : "",
-                    frac: node.Has("frac") ? node["frac"] : 0.5,
-                    a: Layout_ToInt(node.Has("a") ? node["a"] : 0, 0),
-                    b: Layout_ToInt(node.Has("b") ? node["b"] : 0, 0)
-                }
+    if (data is Map && data.Has("monitors") && (data["monitors"] is Map)) {
+        ; Format v2: nach stabilem Monitor-Key
+        for key, layoutMap in data["monitors"] {
+            if (!(layoutMap is Map))
+                continue
+            layout := Layout_DeserializeMonitor(layoutMap)
+            monIdx := Monitors_IndexFromKey(key)
+            if (monIdx) {
+                Layouts[monIdx] := layout
+            } else {
+                MonitorsOffline[key] := layout
+                LogInfo(Format("Layout_LoadAll: monitor [{}] not connected -> layout parked", key))
             }
         }
-        Layouts[monIdx] := {
-            root: Layout_ToInt(layout.Has("root") ? layout["root"] : 1, 1),
-            next: Layout_ToInt(layout.Has("next") ? layout["next"] : (nodes.Count + 1), nodes.Count + 1),
-            nodes: nodes
+    } else if (data is Map) {
+        ; Altes Format: Top-Level-Keys sind Monitorindizes der damaligen Sitzung
+        for mon, layoutMap in data {
+            monIdx := Layout_ToInt(mon, 0)
+            if (!monIdx || !(layoutMap is Map))
+                continue
+            if (monIdx > monCount) {
+                LogInfo(Format("Layout_LoadAll: legacy layout for monitor index {} dropped (not connected)", monIdx))
+                continue
+            }
+            Layouts[monIdx] := Layout_DeserializeMonitor(layoutMap)
         }
+        LogInfo("Layout_LoadAll: migrated legacy index-based layout file")
     }
 
     ; Sicherstellen, dass alle angeschlossenen Monitore Layouts haben
     Loop monCount {
         if (!Layouts.Has(A_Index))
             Layout_Ensure(A_Index)
-    }
-
-    ; Nach dem Laden sicherstellen, dass keine "toten" Monitore existieren
-    count := MonitorGetCount()
-    for mon in Layouts {
-        if (mon > count) {
-            Layouts.Delete(mon)
-        }
     }
 
     ; Anzahl SnapAreas (Leaf-Knoten) pro Monitor ins Log schreiben
@@ -554,30 +561,77 @@ Layout_LoadAll() {
     LogInfo(Format("Layout_LoadAll: loaded layouts for {} monitors", Layouts.Count))
 }
 
-; Serialisiert die Layouts in eine Map-Struktur fuer JSON.
+; Serialisiert die Layouts in eine Map-Struktur fuer JSON (Format v2, nach Monitor-Key).
 Layout_SerializeAll() {
-    global Layouts
-    data := Map()
+    global Layouts, MonitorsOffline
+    monMap := Map()
     for mon, layout in Layouts {
-        if (!IsObject(layout) || !layout.HasOwnProp("nodes") || !IsObject(layout.nodes))
+        layoutMap := Layout_SerializeMonitor(layout)
+        if (!layoutMap)
             continue
-        nodes := Map()
-        for id, node in layout.nodes {
-            nodeMap := Map()
-            nodeMap["parent"] := node.parent
-            nodeMap["split"] := node.split
-            nodeMap["frac"] := node.frac
-            nodeMap["a"] := node.a
-            nodeMap["b"] := node.b
-            nodes[String(id)] := nodeMap
-        }
-        layoutMap := Map()
-        layoutMap["root"] := layout.root
-        layoutMap["next"] := layout.next
-        layoutMap["nodes"] := nodes
-        data[String(mon)] := layoutMap
+        key := Monitors_KeyFromIndex(mon)
+        if (key = "")
+            key := "index:" mon
+        layoutMap["name"] := Monitors_NameFromIndex(mon)
+        layoutMap["index"] := mon
+        monMap[key] := layoutMap
     }
+    ; Nicht angeschlossene Monitore mitschreiben, damit ihr Layout erhalten bleibt
+    for key, layout in MonitorsOffline {
+        if (monMap.Has(key))
+            continue
+        layoutMap := Layout_SerializeMonitor(layout)
+        if (layoutMap)
+            monMap[key] := layoutMap
+    }
+    data := Map()
+    data["version"] := 2
+    data["monitors"] := monMap
     return data
+}
+
+; Serialisiert ein einzelnes Layout-Objekt (root/next/nodes) in eine Map.
+Layout_SerializeMonitor(layout) {
+    if (!IsObject(layout) || !layout.HasOwnProp("nodes") || !IsObject(layout.nodes))
+        return 0
+    nodes := Map()
+    for id, node in layout.nodes {
+        nodeMap := Map()
+        nodeMap["parent"] := node.parent
+        nodeMap["split"] := node.split
+        nodeMap["frac"] := node.frac
+        nodeMap["a"] := node.a
+        nodeMap["b"] := node.b
+        nodes[String(id)] := nodeMap
+    }
+    layoutMap := Map()
+    layoutMap["root"] := layout.root
+    layoutMap["next"] := layout.next
+    layoutMap["nodes"] := nodes
+    return layoutMap
+}
+
+; Baut aus einer geladenen Map ein Layout-Objekt (root/next/nodes).
+Layout_DeserializeMonitor(layoutMap) {
+    nodes := Map()
+    if (layoutMap.Has("nodes") && IsObject(layoutMap["nodes"])) {
+        for id, node in layoutMap["nodes"] {
+            nid := Layout_ToInt(id, 1)
+            nodes[nid] := {
+                id: nid,
+                parent: Layout_ToInt(node.Has("parent") ? node["parent"] : 0, 0),
+                split: node.Has("split") ? node["split"] : "",
+                frac: node.Has("frac") ? node["frac"] : 0.5,
+                a: Layout_ToInt(node.Has("a") ? node["a"] : 0, 0),
+                b: Layout_ToInt(node.Has("b") ? node["b"] : 0, 0)
+            }
+        }
+    }
+    return {
+        root: Layout_ToInt(layoutMap.Has("root") ? layoutMap["root"] : 1, 1),
+        next: Layout_ToInt(layoutMap.Has("next") ? layoutMap["next"] : (nodes.Count + 1), nodes.Count + 1),
+        nodes: nodes
+    }
 }
 
 ; Konvertiert einen Wert in Integer mit Default bei Fehler.
@@ -1085,8 +1139,12 @@ AutoSnap_AssignedWindows() {
     global Layouts
     if (StateGet("ScriptPaused", false))
         return
+    if (StateGet("DisplayChangePending", false))
+        return
     for mon, layout in Layouts {
         if (!IsObject(layout) || !layout.HasOwnProp("assignments"))
+            continue
+        if (!Monitors_IsValid(mon))
             continue
 
         for entry in layout.assignments {
@@ -1142,15 +1200,22 @@ AutoSnap_NewlyStartedWindows() {
     global Layouts, WinToLeaf
     if (StateGet("ScriptPaused", false))
         return
+    ; Waehrend eines Monitor-Hotplugs nichts verschieben: Windows raeumt die Fenster
+    ; gerade selbst um, und die Monitorindizes werden gleich neu zugeordnet.
+    if (StateGet("DisplayChangePending", false))
+        return
 
     ; Aktive SnapArea (Monitor + Leaf) bestimmen
     ctx := ApplyManualNavigation(GetLeafNavigationContext())
-    if (!ctx.mon) {
-        if (MonitorGetCount() = 0)
+    if (!ctx.mon || !Monitors_IsValid(ctx.mon)) {
+        if (Monitors_Count() = 0)
             return
         ctx.mon := 1
+        ctx.leaf := 0
     }
     Layout_Ensure(ctx.mon)
+    if (!Layouts.Has(ctx.mon))
+        return
     if (!ctx.leaf) {
         sel := GetSelectedLeaf(ctx.mon)
         ctx.leaf := sel ? sel : Layouts[ctx.mon].root
@@ -1199,7 +1264,8 @@ AutoSnap_NewlyStartedWindows() {
             info := WinToLeaf[hwnd]
             mon := info.mon
             leaf := info.leaf
-            Layout_Ensure(mon)
+            if (!Monitors_IsValid(mon) || !Layouts.Has(mon) || !Layouts[mon].nodes.Has(leaf))
+                continue ; Zuordnung veraltet (Monitor weg) -> wird vom Monitor-Handler bereinigt
             r := GetLeafRectPx(mon, leaf)
             try {
                 WinGetPos &x, &y, &w, &h, "ahk_id " hwnd

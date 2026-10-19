@@ -666,6 +666,11 @@ WindowPills_Update() {
         WindowPills_Clear()
         return
     }
+    ; Waehrend eines Monitor-Hotplugs nicht neu bauen (wuerde ueber ReapplySubtree
+    ; Fenster anhand veralteter Monitorindizes verschieben). Der Handler stoesst
+    ; danach selbst ein Update an.
+    if (StateGet("DisplayChangePending", false))
+        return
     global LeafWindows
     global WindowPillsReserve
     WindowPills_Init()
@@ -720,6 +725,10 @@ WindowPills_Update() {
             continue
         mon := parts[1] + 0
         leafId := parts[2] + 0
+        ; Keine Pills fuer Leaves nicht angeschlossener Monitore (wuerden sonst auf
+        ; Monitor 1 ueber dessen eigene Pills gezeichnet)
+        if (!Monitors_IsValid(mon))
+            continue
 
         ; Validate rect
         try {

@@ -109,6 +109,8 @@ ApplyLeafHighlight(mon, leafId) {
 ; Aktualisiert das Highlight basierend auf aktivem Fenster/manueller Auswahl.
 UpdateActiveHighlight(*) {
     global WinToLeaf, WindowSearch, DragSnap
+    if (StateGet("DisplayChangePending", false))
+        return
     try {
         if (IsSet(DragSnap) && DragSnap.active)
             return
