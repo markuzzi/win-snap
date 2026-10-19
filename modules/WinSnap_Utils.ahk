@@ -55,6 +55,20 @@ GetMonitorWork(mon) {
     return { left:L, top:T, right:R, bottom:B }
 }
 
+; Prueft, ob DWM das Fenster "cloaked" hat (z.B. unsichtbare UWP-Fenster, die
+; trotzdem WS_VISIBLE tragen).
+WinIsCloaked(hwnd) {
+    try {
+        buf := Buffer(4, 0)
+        ; DWMWA_CLOAKED = 14
+        hr := DllCall("dwmapi\DwmGetWindowAttribute", "ptr", hwnd, "int", 14, "ptr", buf, "int", 4, "int")
+        return (hr = 0) && (NumGet(buf, 0, "Int") != 0)
+    }
+    catch Error as e {
+        return false
+    }
+}
+
 ; Stellt sicher, dass ein Fenster vor dem Verschieben restaurierbar ist (z.B. aus minimiert).
 EnsureRestorable(hwnd) {
     mm := 0

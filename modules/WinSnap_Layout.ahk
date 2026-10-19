@@ -1197,7 +1197,7 @@ FindWindow(exe, title := "") {
 ; - Neue Fenster ohne Leaf-Zuordnung werden in die aktuell aktive SnapArea gesnappt.
 ; - Bereits zugeordnete Fenster werden bei Bedarf in ihr Leaf zurueckgesetzt (z.B. nach Restore).
 AutoSnap_NewlyStartedWindows() {
-    global Layouts, WinToLeaf
+    global Layouts, WinToLeaf, ExpandedWindows
     if (StateGet("ScriptPaused", false))
         return
     ; Waehrend eines Monitor-Hotplugs nichts verschieben: Windows raeumt die Fenster
@@ -1266,6 +1266,17 @@ AutoSnap_NewlyStartedWindows() {
             leaf := info.leaf
             if (!Monitors_IsValid(mon) || !Layouts.Has(mon) || !Layouts[mon].nodes.Has(leaf))
                 continue ; Zuordnung veraltet (Monitor weg) -> wird vom Monitor-Handler bereinigt
+            ; Bewusst vergroesserte Fenster (Expand ueber Nachbar-Area, Maximiert) nicht
+            ; zurueckholen: ihre Mitte liegt zwangslaeufig ausserhalb des Leafs.
+            if (ExpandedWindows.Has(hwnd))
+                continue
+            try {
+                mm := WinGetMinMax("ahk_id " hwnd)
+            } catch {
+                mm := 0
+            }
+            if (mm = 1)
+                continue
             r := GetLeafRectPx(mon, leaf)
             try {
                 WinGetPos &x, &y, &w, &h, "ahk_id " hwnd

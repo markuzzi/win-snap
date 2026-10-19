@@ -752,6 +752,31 @@ IsCollectibleSnapWindow(hwnd) {
     if (!(style & WS_VISIBLE))
         return false
     try {
+        exStyle := WinGetExStyle("ahk_id " hwnd)
+    } catch {
+        exStyle := 0
+    }
+    ; Kriterium "hat einen Taskleisten-Button": keine Tool-Windows, keine owned
+    ; Fenster (Dialoge, Popups) ausser mit WS_EX_APPWINDOW.
+    WS_EX_TOOLWINDOW := 0x80
+    WS_EX_APPWINDOW := 0x40000
+    if (exStyle & WS_EX_TOOLWINDOW)
+        return false
+    if (!(exStyle & WS_EX_APPWINDOW)) {
+        owner := 0
+        try owner := DllCall("GetWindow", "ptr", hwnd, "uint", 4, "ptr") ; GW_OWNER
+        if (owner)
+            return false
+    }
+    ; Rahmenlose Fenster (Tooltips, Splash-Screens, Benachrichtigungen, Overlays)
+    WS_CAPTION := 0xC00000
+    WS_THICKFRAME := 0x40000
+    if (((style & WS_CAPTION) != WS_CAPTION) && !(style & WS_THICKFRAME))
+        return false
+    ; Von DWM "gecloakte" Fenster (unsichtbare UWP-/Store-App-Huellen)
+    if (WinIsCloaked(hwnd))
+        return false
+    try {
         mm := WinGetMinMax("ahk_id " hwnd)
     } catch {
         mm := 0
