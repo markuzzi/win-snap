@@ -451,6 +451,8 @@ LeafAttachWindow(hwnd, mon, leafId, updateSelection := true) {
     }
     arr.InsertAt(1, hwnd)
     WinToLeaf[hwnd] := { mon:mon, leaf:leafId }
+    ; Ein (neues) Snappen beendet eine evtl. bestehende Expansion ueber Nachbar-Areas
+    ExpandedWindows_Forget(hwnd)
     if (updateSelection)
         SelectLeaf(mon, leafId, "auto")
 

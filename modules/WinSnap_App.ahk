@@ -92,18 +92,12 @@ TogglePause() {
     global WindowPills
     newState := !StateGet("ScriptPaused", false)
     StateSet("ScriptPaused", newState)
-    ; Timer steuern: Active-Highlight und AutoSnap-NewWindows
+    ; Timer steuern: Active-Highlight (AutoSnap laeuft ueber den Shell-Hook, nicht per Timer)
     try {
         SetTimer(UpdateActiveHighlight, newState ? 0 : 150)
     }
     catch Error as e {
         LogError("TogglePause: SetTimer(UpdateActiveHighlight) failed")
-    }
-    try {
-        SetTimer(AutoSnap_NewlyStartedWindows, newState ? 0 : 2000)
-    }
-    catch Error as e {
-        LogError("TogglePause: SetTimer(AutoSnap_NewlyStartedWindows) failed")
     }
     if (newState) {
         try {
@@ -148,6 +142,13 @@ TogglePause() {
         }
         catch Error as e {
             LogError("TogglePause: UpdateActiveHighlight failed")
+        }
+        ; Einmalig nachholen, was waehrend der Pause an neuen Fenstern aufgelaufen ist
+        try {
+            AutoSnap_NewlyStartedWindows()
+        }
+        catch Error as e {
+            LogException(e, "TogglePause: AutoSnap catch-up failed")
         }
         try {
             if (IsObject(WindowPills))
@@ -258,25 +259,31 @@ InitShellHook() {
 ; Handler fǬr Shell-Hook-Messages.
 ; Reagiert auf Fenster-Erstellung, -Zerstörung und -Aktivierung.
 ShellMessage_Handler(wParam, lParam, msg, hwnd) {
-    ; HSHELL_WINDOWCREATED = 1, HSHELL_WINDOWDESTROYED = 2, HSHELL_WINDOWACTIVATED = 4
-    if (StateGet("ScriptPaused", false)) {
-        if (wParam = 2) {
-            try {
-                LeafDetachWindow(lParam, true)
-            }
-            catch Error as e {
-                LogException(e, "ShellMessage_Handler: LeafDetachWindow paused failed")
-            }
+    ; HSHELL_WINDOWCREATED = 1, HSHELL_WINDOWDESTROYED = 2, HSHELL_WINDOWACTIVATED = 4,
+    ; HSHELL_RUDEAPPACTIVATED = 0x8004 (Aktivierung von Vollbild-Fenstern)
+    if (wParam = 2) {
+        ; Fenster wurde zerstoert -> aus Leaf-Listen und allen pro-Fenster-Maps
+        ; entfernen, damit Pills/Layout sofort stimmen und recycelte HWNDs
+        ; keine fremden Zustaende erben.
+        try {
+            LeafDetachWindow(lParam, true)
+        }
+        catch Error as e {
+            LogException(e, "ShellMessage_Handler: LeafDetachWindow failed")
+        }
+        try {
+            Window_ForgetState(lParam)
+        }
+        catch Error as e {
+            LogException(e, "ShellMessage_Handler: Window_ForgetState failed")
         }
         return 0
     }
+    if (StateGet("ScriptPaused", false))
+        return 0
     try {
-        if (wParam = 1 || wParam = 4) {
+        if (wParam = 1 || wParam = 4 || wParam = 0x8004) {
             AutoSnap_NewlyStartedWindows()
-        } else if (wParam = 2) {
-            ; Fenster wurde zerstört -> ggf. aus Leaf-Listen entfernen,
-            ; damit Pills und Layout sofort stimmen.
-            LeafDetachWindow(lParam, true)
         }
     }
     catch Error as e {

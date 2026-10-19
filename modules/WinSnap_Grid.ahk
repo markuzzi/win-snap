@@ -835,6 +835,25 @@ ExpandWindowAcrossNeighbor(dir) {
 ; Enhanced expansion with state and reduction support
 global ExpandedWindows := Map() ; hwnd -> { mon, baseLeaf, dir, neighbor, attached }
 
+; Beendet den Expand-Status eines Fensters (z.B. weil es neu gesnappt wurde).
+ExpandedWindows_Forget(hwnd) {
+    global ExpandedWindows
+    if (ExpandedWindows.Has(hwnd))
+        ExpandedWindows.Delete(hwnd)
+}
+
+; Vergisst alle pro-Fenster-Zustaende eines geschlossenen Fensters. Windows
+; recycelt HWNDs, sonst erbt ein neues Fenster fremde Restore-Positionen.
+Window_ForgetState(hwnd) {
+    global WinHistory, LastDir, ExpandedWindows, MaximizeRestoreState, MonitorsDisplaced
+    for m in [WinHistory, LastDir, ExpandedWindows, MaximizeRestoreState, MonitorsDisplaced] {
+        try {
+            if (m.Has(hwnd))
+                m.Delete(hwnd)
+        }
+    }
+}
+
 ; Liefert die Gegenrichtung zu dir.
 OppositeDir(dir) {
     if (dir = "left")
@@ -863,7 +882,7 @@ ExpandOrReduceWindow(dir) {
     if (ExpandedWindows.Has(hwnd)) {
         st := ExpandedWindows[hwnd]
         if (st.mon != mon) {
-            ExpandedWindows.Delete(hwnd)
+            ExpandedWindows_Forget(hwnd)
         } else if (OppositeDir(dir) = st.dir) {
             if (st.attached) {
                 SnapToLeaf(hwnd, st.mon, st.baseLeaf)
@@ -878,7 +897,7 @@ ExpandOrReduceWindow(dir) {
                 LogError("ExpandOrReduceWindow: ApplyLeafHighlight failed (reduce)")
             }
             }
-            ExpandedWindows.Delete(hwnd)
+            ExpandedWindows_Forget(hwnd)
             LogInfo(Format("ExpandOrReduceWindow: reduced hwnd={} back to leaf {}", hwnd, st.baseLeaf))
             return
         }

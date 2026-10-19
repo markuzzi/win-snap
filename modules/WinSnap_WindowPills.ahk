@@ -26,7 +26,9 @@ WindowPills_Init() {
         WindowPills.zApplied := Map()
     if (!WindowPills.hooks) {
         try {
-            OnMessage(0x0201, WP_OnMouse) ; WM_LBUTTONDOWN
+            ; Nur WM_LBUTTONUP: Klicks auf den Pill-Hintergrund (neben Icon/Text).
+            ; Klicks auf die Controls laufen ueber deren Click-Events; ein Hook auf
+            ; LBUTTONDOWN wuerde WinActivate doppelt ausloesen.
             OnMessage(0x0202, WP_OnMouse) ; WM_LBUTTONUP
             WindowPills.hooks := true
         }
