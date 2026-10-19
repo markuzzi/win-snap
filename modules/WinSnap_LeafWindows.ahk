@@ -567,6 +567,29 @@ LeafGetTopWindow(mon, leafId) {
     return 0
 }
 
+; Liefert je Leaf-Key ("mon:leaf") das oberste Fenster in Z-Order mit einem
+; einzigen WinGetList-Aufruf (statt einem pro Leaf wie LeafGetTopWindow).
+LeafTopWindowsByZOrder() {
+    global WinToLeaf
+    out := Map()
+    try {
+        osList := WinGetList()
+    }
+    catch Error as e {
+        LogError("LeafTopWindowsByZOrder: WinGetList failed")
+        return out
+    }
+    for hwnd in osList {
+        if (!WinToLeaf.Has(hwnd))
+            continue
+        info := WinToLeaf[hwnd]
+        key := LeafKey(info.mon, info.leaf)
+        if (!out.Has(key))
+            out[key] := hwnd
+    }
+    return out
+}
+
 ; Liefert die bereinigte, geordnete Fensterliste eines Leafs.
 LeafGetOrderedList(mon, leafId) {
     global LeafWindows

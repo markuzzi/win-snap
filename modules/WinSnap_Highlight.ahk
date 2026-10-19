@@ -11,6 +11,8 @@ HL_Init() {
     g.BackColor := "Teal"
     HL.gui := g
     HL.init := true
+    HL.visible := false
+    HL.lastKey := ""
     LogDebug("HL_Init: highlight GUI initialized")
 }
 
@@ -25,6 +27,13 @@ ShowHighlightRect(rect) {
     y := rect.T
     w := Max(1, rect.R - rect.L)
     h := Max(1, rect.B - rect.T)
+    ; Wird alle 150 ms aufgerufen: bei unveraendertem Rechteck keine neuen
+    ; GDI-Regionen erzeugen und nicht neu zeichnen.
+    key := x "," y "," w "," h
+    if (HL.visible && HL.lastKey = key)
+        return
+    HL.lastKey := key
+    HL.visible := true
     radius := 12
     border := BorderPx
 
@@ -54,12 +63,16 @@ ShowHighlightRect(rect) {
 HideHighlight() {
     global HL, CurrentHighlight, AppState
     if (HL.init) {
-        try {
-            HL.gui.Hide()
+        if (HL.visible) {
+            try {
+                HL.gui.Hide()
+            }
+            catch Error as e {
+                LogError("HideHighlight: gui.Hide failed")
+            }
         }
-        catch Error as e {
-            LogError("HideHighlight: gui.Hide failed")
-        }
+        HL.visible := false
+        HL.lastKey := ""
     }
     if (!IsObject(CurrentHighlight)) {
         CurrentHighlight := {mon:0, leaf:0}
@@ -132,6 +145,19 @@ UpdateActiveHighlight(*) {
     }
     if (!hwnd || !DllCall("IsWindow", "ptr", hwnd) || !WinExist("ahk_id " hwnd))
         return
+    ; Fokuswechsel: einmal Pills aktualisieren (aktive Pill/Rahmen), statt in
+    ; jedem Tick. SelectLeaf/LeafRecordActivation invalidieren nur bei echten
+    ; Aenderungen der Auswahl bzw. Reihenfolge.
+    static lastActive := 0
+    if (hwnd != lastActive) {
+        lastActive := hwnd
+        try {
+            WindowPills_Invalidate()
+        }
+        catch Error as e {
+            LogException(e, "UpdateActiveHighlight: WindowPills_Invalidate failed")
+        }
+    }
     if (WinToLeaf.Has(hwnd))
         LeafRecordActivation(hwnd)
     else {

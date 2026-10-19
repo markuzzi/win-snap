@@ -25,25 +25,39 @@ SelectLeaf(mon, leafId, source := "manual") {
         HideHighlight()
         return
     }
-    state := CurrentLeafSelection.Has(mon) ? CurrentLeafSelection[mon] : {leaf:0, source:"auto"}
+    had := CurrentLeafSelection.Has(mon)
+    state := had ? CurrentLeafSelection[mon] : {leaf:0, source:"auto"}
     if (!leafId) {
         if (source = "auto" && state.source = "manual" && state.leaf && !LeafHasWindows(mon, state.leaf))
             return
-        if (CurrentLeafSelection.Has(mon))
+        if (had)
             CurrentLeafSelection.Delete(mon)
         if (CurrentHighlight.mon = mon)
             HideHighlight()
         ManualNav_Clear(mon)
+        if (had) {
+            try {
+                WindowPills_Invalidate()
+            }
+            catch Error as e {
+                LogException(e, "SelectLeaf: WindowPills_Invalidate failed")
+            }
+        }
         return
     }
     if (source = "auto" && state.source = "manual" && state.leaf && state.leaf != leafId && !LeafHasWindows(mon, state.leaf))
         return
+    ; Diese Funktion laeuft ueber den 150-ms-Ticker staendig: Pills nur
+    ; invalidieren, wenn sich die Auswahl tatsaechlich geaendert hat.
+    unchanged := had && (state.leaf = leafId) && (state.source = source)
     CurrentLeafSelection[mon] := { leaf:leafId, source:source }
     if (source = "manual")
         ManualNav_Set(mon, leafId)
     else
         ManualNav_Clear(mon)
     ApplyLeafHighlight(mon, leafId)
+    if (unchanged)
+        return
     try {
         WindowPills_Invalidate()
     }
@@ -72,9 +86,16 @@ LeafRecordActivation(hwnd) {
     if (!LeafWindows.Has(key))
         LeafWindows[key] := []
     arr := LeafWindows[key]
+    suppress := (IsSet(SuppressActivationReorder) && SuppressActivationReorder)
+    ; Schnellpfad (Ticker alle 150 ms): Fenster steht bereits vorne -> nur die
+    ; Auswahl nachziehen, keine Neuordnung und keine Pills-Invalidierung.
+    if (!suppress && arr.Length && arr[1] = hwnd) {
+        SelectLeaf(info.mon, info.leaf, "auto")
+        return
+    }
     ; Wenn Unterdrueckung aktiv ist, Liste nur bereinigen und sicherstellen,
     ; dass hwnd enthalten ist, ohne die Reihenfolge zu verschieben.
-    if (IsSet(SuppressActivationReorder) && SuppressActivationReorder) {
+    if (suppress) {
         found := false
         idx := 1
         while (idx <= arr.Length) {

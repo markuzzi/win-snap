@@ -57,6 +57,7 @@ WindowPills_Clear() {
     try {
         WindowPills.guiToHwnd := Map()
         WindowPills.zApplied := Map()
+        WindowPills.appearance := Map()
     }
     catch Error as e {
         LogException(e, "WindowPills_Clear: reset guiToHwnd failed")
@@ -638,6 +639,8 @@ WP_CreatePill(x, y, text, isActive, targetHwnd := 0) {
         global WindowPills
         if (targetHwnd)
             WindowPills.guiToHwnd[g.Hwnd] := targetHwnd
+        if (WindowPills.HasOwnProp("appearance") && (WindowPills.appearance is Map))
+            WindowPills.appearance[g.Hwnd] := isActive
         if (IsObject(g))
             g.OnEvent("ContextMenu", (*) => WP_OnPillContextMenu(targetHwnd))
         if (IsObject(ctrl))
@@ -707,6 +710,8 @@ WindowPills_Update() {
     oldPills := WindowPills.pills
     WindowPills.pills := []
     WindowPills.guiToHwnd := Map()
+    WindowPills.appearance := Map()
+    topByLeaf := LeafTopWindowsByZOrder()
 
     ; Iterate all leaves with windows
     for key, arr in LeafWindows {
@@ -763,7 +768,7 @@ WindowPills_Update() {
             }
         }
         if (!activeHwnd)
-            activeHwnd := LeafGetTopWindow(mon, leafId)
+            activeHwnd := topByLeaf.Has(key) ? topByLeaf[key] : LeafGetTopWindow(mon, leafId)
 
         ; Placement parameters
         global WindowPillsMarginX, WindowPillsMarginY, WindowPillsGap
@@ -975,8 +980,9 @@ WP_EnsureActivePillBorderGui() {
 WP_HideActivePillBorder() {
     global WindowPills
     try {
-        if (IsObject(WindowPills.borderGui))
+        if (IsObject(WindowPills.borderGui) && WindowPills.HasOwnProp("borderSig") && WindowPills.borderSig != "")
             WindowPills.borderGui.Hide()
+        WindowPills.borderSig := ""
     }
     catch Error as e {
         LogException(e, "WP_HideActivePillBorder: failed")
@@ -984,7 +990,7 @@ WP_HideActivePillBorder() {
 }
 
 WP_ShowActivePillBorder(pillGui) {
-    global WindowPillsActiveBorderPx, WindowPillsRadius
+    global WindowPillsActiveBorderPx, WindowPillsRadius, WindowPills
     if (!IsObject(pillGui))
         return
     g := WP_EnsureActivePillBorderGui()
@@ -992,6 +998,11 @@ WP_ShowActivePillBorder(pillGui) {
         return
     try {
         WinGetPos(&x, &y, &w, &h, "ahk_id " pillGui.Hwnd)
+        ; Rahmen nur neu setzen, wenn Ziel-Pill oder Geometrie sich geaendert haben
+        sig := pillGui.Hwnd ":" x ":" y ":" w ":" h
+        if (WindowPills.HasOwnProp("borderSig") && WindowPills.borderSig = sig)
+            return
+        WindowPills.borderSig := sig
         b := Max(1, WindowPillsActiveBorderPx)
         bx := x - b
         by := y - b
@@ -1298,18 +1309,13 @@ WP_RefreshActiveStyles() {
             WP_ApplyZOrderMode()
             return
         }
-        ; Build active per leaf
-        activeMap := Map() ; key mon:leaf -> hwnd
+        ; Build active per leaf (ein WinGetList fuer alle Leaves)
+        activeMap := LeafTopWindowsByZOrder() ; key mon:leaf -> hwnd
         try {
             sysActive := WinGetID("A")
         }
         catch Error as e {
             sysActive := 0
-        }
-        for hwnd, info in WinToLeaf {
-            key := info.mon ":" info.leaf
-            if (!activeMap.Has(key))
-                activeMap[key] := LeafGetTopWindow(info.mon, info.leaf)
         }
         if (sysActive && WinToLeaf.Has(sysActive)) {
             st := WinToLeaf[sysActive]
@@ -1328,7 +1334,9 @@ WP_RefreshActiveStyles() {
             activeAreaLeaf := CurrentHighlight.leaf
         }
 
-        ; Update each pill's appearance
+        ; Update each pill's appearance (SetFont loest ein Neuzeichnen aus -> nur bei Aenderung)
+        if (!WindowPills.HasOwnProp("appearance") || !(WindowPills.appearance is Map))
+            WindowPills.appearance := Map()
         borderShown := false
         for g in WindowPills.pills {
             guiHwnd := g.Hwnd
@@ -1341,7 +1349,11 @@ WP_RefreshActiveStyles() {
             key := info.mon ":" info.leaf
             isActive := (activeMap.Has(key) && activeMap[key] = target)
             isInActiveArea := (activeAreaMon = info.mon && activeAreaLeaf = info.leaf)
-            WP_SetPillAppearance(g, isActive)
+            prevActive := WindowPills.appearance.Has(guiHwnd) ? WindowPills.appearance[guiHwnd] : -1
+            if (prevActive != isActive) {
+                WP_SetPillAppearance(g, isActive)
+                WindowPills.appearance[guiHwnd] := isActive
+            }
             if (isActive && isInActiveArea && !borderShown) {
                 WP_ShowActivePillBorder(g)
                 borderShown := true
