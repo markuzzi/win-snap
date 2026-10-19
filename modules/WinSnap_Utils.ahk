@@ -105,12 +105,31 @@ LogWrite(levelNum, levelName, msg) {
     if (levelNum > thresh)
         return
     path := StateGet("LoggingPath", StateGet("FrameCompLogPath", A_ScriptDir "\WinSnap.log"))
+    static writes := 0
+    writes += 1
+    if (Mod(writes, 250) = 1)
+        LogRotateIfNeeded(path)
     try {
         stamp := FormatTime(, "yyyy-MM-dd HH:mm:ss")
         FileAppend(stamp " | " levelName " | " msg "`n", path, "UTF-8")
     }
     catch Error as e {
         ; Avoid recursive logging here
+    }
+}
+
+; Rotiert das Log (WinSnap.log -> WinSnap.log.1), sobald es LoggingMaxBytes ueberschreitet.
+LogRotateIfNeeded(path) {
+    maxBytes := StateGet("LoggingMaxBytes", 10 * 1024 * 1024)
+    if (maxBytes <= 0)
+        return
+    try {
+        if (!FileExist(path) || FileGetSize(path) < maxBytes)
+            return
+        FileMove(path, path ".1", true)
+    }
+    catch Error as e {
+        ; best effort
     }
 }
 
@@ -333,6 +352,9 @@ MoveWindow(hwnd, x, y, w, h) {
         DebugLog("Monitors_IndexFromPoint failed in MoveWindow")
     }
     cacheKey := className ":" procName ":" monIdx
+    usedCache := false
+    srcMon := 0
+    try srcMon := Monitors_IndexFromWindow(hwnd)
     DebugLog(Format("MoveWindow start hwnd={}, class={}, proc={}, key={}, policy={}, target=({}, {}, {}, {})", hwnd, className, procName, cacheKey, policy, x, y, w, h))
 
     try {
@@ -344,6 +366,7 @@ MoveWindow(hwnd, x, y, w, h) {
                 y0 := y - off.T
                 w0 := w + off.L + off.R
                 h0 := h + off.T + off.B
+                usedCache := true
                 DebugLog(Format("Using cached offset for key {}: L={},T={},R={},B={} => preMove=({}, {}, {}, {})", cacheKey, off.L, off.T, off.R, off.B, x0, y0, w0, h0))
             }
         } else if (policy != "full") {
@@ -361,7 +384,9 @@ MoveWindow(hwnd, x, y, w, h) {
         DebugLog("WinMove initial failed")
         return false
     }
-    Sleep 15
+    ; Mit gecachten Offsets ist der erste Move meist schon korrekt; dann reicht
+    ; eine kurze Pause bis DWM die Frame-Bounds aktualisiert hat.
+    Sleep (usedCache ? 5 : 15)
 
     ; Extended Frame Bounds ermitteln und ggf. korrigieren
     if (policy = "off") {
@@ -443,12 +468,14 @@ MoveWindow(hwnd, x, y, w, h) {
         }
     }
 
-    ; Nachkontrolle: Beim Wechsel auf einen Monitor mit anderer DPI skaliert die App
-    ; ihr Fenster nach WM_DPICHANGED selbst um, oft erst nach unserem Move. Einmal
-    ; nachmessen und bei Abweichung erneut setzen.
+    ; Nachkontrolle nur bei Monitorwechsel: Beim Wechsel auf einen Monitor mit
+    ; anderer DPI skaliert die App ihr Fenster nach WM_DPICHANGED selbst um, oft
+    ; erst nach unserem Move. Einmal nachmessen und bei Abweichung erneut setzen.
     try {
         if (!IsSet(x1))
             x1 := x0, y1 := y0, w1 := w0, h1 := h0
+        if (srcMon = monIdx)
+            throw Error("same monitor")
         Sleep 25
         WinGetPos &cx, &cy, &cw, &ch, "ahk_id " hwnd
         if (Abs(cx - x1) > 2 || Abs(cy - y1) > 2 || Abs(cw - w1) > 2 || Abs(ch - h1) > 2) {

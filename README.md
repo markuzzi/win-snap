@@ -100,7 +100,7 @@ AutoHotkey addresses monitors by a volatile index (1..N). WinSnap therefore maps
 
 - Layouts persist in `WinSnap_layouts.json` in the repo folder. Delete that file to reset layouts.
 - AutoSnap blacklist rules persist in `WinSnap_BlackList.json`.
-- Logs go to `WinSnap.log` (ignored by git). You can turn logging off via `LoggingEnabled := false`.
+- Logs go to `WinSnap.log` (ignored by git). You can turn logging off via `LoggingEnabled := false`. The log is rotated to `WinSnap.log.1` once it exceeds `LoggingMaxBytes` (default 10 MB).
 
 ## Run at Startup (optional)
 

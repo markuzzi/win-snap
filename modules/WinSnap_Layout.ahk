@@ -654,11 +654,31 @@ BlackList_GetStoragePath() {
     return A_ScriptDir "\WinSnap_BlackList.json"
 }
 
+; Vorkompilierter Index der Regex-Regeln der Blacklist: {className, pattern, key}.
+; Spart bei jeder Fensterpruefung das Durchlaufen der gesamten Blacklist-Map.
+global AutoSnapBlackListRegex := []
+
+BlackList_RebuildIndex() {
+    global AutoSnapBlackList, AutoSnapBlackListRegex
+    BlackList_Ensure()
+    rules := []
+    for key, flag in AutoSnapBlackList {
+        if (!flag)
+            continue
+        if (InStr(key, "titleRegex:") = 1)
+            rules.Push({ className:"", pattern:SubStr(key, 12), key:key })
+        else if (RegExMatch(key, "^class:(.*?)\|titleRegex:(.*)$", &m))
+            rules.Push({ className:m[1], pattern:m[2], key:key })
+    }
+    AutoSnapBlackListRegex := rules
+}
+
 ; Laedt die AutoSnap-Blacklist aus JSON.
 BlackList_Load() {
-    global AutoSnapBlackList
+    global AutoSnapBlackList, AutoSnapBlackListRegex
     path := BlackList_GetStoragePath()
     AutoSnapBlackList := Map()
+    AutoSnapBlackListRegex := []
     if (!FileExist(path))
         return
     try {
@@ -676,6 +696,7 @@ BlackList_Load() {
             continue
         AutoSnapBlackList[key] := true
     }
+    BlackList_RebuildIndex()
 }
 
 ; Speichert die aktuelle AutoSnap-Blacklist als JSON.
@@ -698,6 +719,7 @@ BlackList_Save() {
     } catch {
         MsgBox "BlackList_Save(): Fehler beim Schreiben der BlackList-Datei!"
     }
+    BlackList_RebuildIndex()
     LogInfo(Format("BlackList_Save: saved to {}", path))
 }
 
@@ -758,7 +780,7 @@ BlackList_GetExactCandidateKeys(exe := "", className := "", title := "") {
 }
 
 BlackList_GetMatchingKeys(exe := "", className := "", title := "") {
-    global AutoSnapBlackList
+    global AutoSnapBlackList, AutoSnapBlackListRegex
     BlackList_Ensure()
     matches := []
     seen := Map()
@@ -769,23 +791,14 @@ BlackList_GetMatchingKeys(exe := "", className := "", title := "") {
         }
     }
     if (title) {
-        titleRegexPrefix := "titleRegex:"
-        comboRegexPrefix := className ? "class:" . className . "|titleRegex:" : ""
-        for key, flag in AutoSnapBlackList {
-            if (!flag || seen.Has(key))
+        for rule in AutoSnapBlackListRegex {
+            if (seen.Has(rule.key))
                 continue
-            if (InStr(key, titleRegexPrefix) = 1) {
-                pattern := SubStr(key, StrLen(titleRegexPrefix) + 1)
-                if (BlackList_TitleRegexMatches(pattern, title, key)) {
-                    matches.Push(key)
-                    seen[key] := true
-                }
-            } else if (comboRegexPrefix && InStr(key, comboRegexPrefix) = 1) {
-                pattern := SubStr(key, StrLen(comboRegexPrefix) + 1)
-                if (BlackList_TitleRegexMatches(pattern, title, key)) {
-                    matches.Push(key)
-                    seen[key] := true
-                }
+            if (rule.className != "" && rule.className != className)
+                continue
+            if (BlackList_TitleRegexMatches(rule.pattern, title, rule.key)) {
+                matches.Push(rule.key)
+                seen[rule.key] := true
             }
         }
     }
@@ -1196,104 +1209,130 @@ FindWindow(exe, title := "") {
 ; - Alle nicht geblacklisteten Fenster werden einer SnapArea zugeordnet.
 ; - Neue Fenster ohne Leaf-Zuordnung werden in die aktuell aktive SnapArea gesnappt.
 ; - Bereits zugeordnete Fenster werden bei Bedarf in ihr Leaf zurueckgesetzt (z.B. nach Restore).
-AutoSnap_NewlyStartedWindows() {
-    global Layouts, WinToLeaf, ExpandedWindows
-    if (StateGet("ScriptPaused", false))
-        return
-    ; Waehrend eines Monitor-Hotplugs nichts verschieben: Windows raeumt die Fenster
-    ; gerade selbst um, und die Monitorindizes werden gleich neu zugeordnet.
-    if (StateGet("DisplayChangePending", false))
-        return
-
-    ; Aktive SnapArea (Monitor + Leaf) bestimmen
+; Ermittelt die Ziel-SnapArea fuer noch unzugeordnete Fenster (aktive Area, sonst Fallback).
+AutoSnap_GetTarget() {
+    global Layouts
     ctx := ApplyManualNavigation(GetLeafNavigationContext())
     if (!ctx.mon || !Monitors_IsValid(ctx.mon)) {
         if (Monitors_Count() = 0)
-            return
+            return 0
         ctx.mon := 1
         ctx.leaf := 0
     }
     Layout_Ensure(ctx.mon)
     if (!Layouts.Has(ctx.mon))
-        return
+        return 0
     if (!ctx.leaf) {
         sel := GetSelectedLeaf(ctx.mon)
         ctx.leaf := sel ? sel : Layouts[ctx.mon].root
     }
     if (!ctx.leaf)
-        return
+        return 0
     if (!Layouts[ctx.mon].nodes.Has(ctx.leaf))
         ctx.leaf := Layouts[ctx.mon].root
+    return { mon:ctx.mon, leaf:ctx.leaf }
+}
 
-    targetMon := ctx.mon
-    targetLeaf := ctx.leaf
+; Verarbeitet ein einzelnes Fenster: Blacklist pruefen, ein zugeordnetes Fenster
+; ggf. in sein Leaf zurueckholen, ein unzugeordnetes in die Ziel-Area einsortieren.
+AutoSnap_ProcessWindow(hwnd, target) {
+    global Layouts, WinToLeaf, ExpandedWindows
+    if (!IsCollectibleSnapWindow(hwnd))
+        return false
 
-    ; Alle Fenster durchgehen und passend einsortieren
+    ; Prozessname/Klasse ermitteln und ggf. Blacklist pruefen
+    try {
+        exe := WinGetProcessName("ahk_id " hwnd)
+    } catch {
+        exe := ""
+    }
+    try {
+        className := WinGetClass("ahk_id " hwnd)
+    } catch {
+        className := ""
+    }
+    try {
+        title := WinGetTitle("ahk_id " hwnd)
+    } catch {
+        title := ""
+    }
+    if ((exe || className || title) && IsBlacklistedExe(exe, className, title))
+        return false
+
+    ; Bereits einem Leaf zugeordnet? -> sicherstellen, dass es in seinem Leaf liegt.
+    if (WinToLeaf.Has(hwnd)) {
+        info := WinToLeaf[hwnd]
+        mon := info.mon
+        leaf := info.leaf
+        if (!Monitors_IsValid(mon) || !Layouts.Has(mon) || !Layouts[mon].nodes.Has(leaf))
+            return false ; Zuordnung veraltet (Monitor weg) -> wird vom Monitor-Handler bereinigt
+        ; Bewusst vergroesserte Fenster (Expand ueber Nachbar-Area, Maximiert) nicht
+        ; zurueckholen: ihre Mitte liegt zwangslaeufig ausserhalb des Leafs.
+        if (ExpandedWindows.Has(hwnd))
+            return false
+        try {
+            mm := WinGetMinMax("ahk_id " hwnd)
+        } catch {
+            mm := 0
+        }
+        if (mm = 1)
+            return false
+        r := GetLeafRectPx(mon, leaf)
+        try {
+            WinGetPos &x, &y, &w, &h, "ahk_id " hwnd
+        } catch {
+            return false
+        }
+        cx := x + (w / 2)
+        cy := y + (h / 2)
+        if (cx < r.L || cx > r.R || cy < r.T || cy > r.B) {
+            SnapWindowToLeaf(hwnd, mon, leaf)
+            return true
+        }
+        return false
+    }
+
+    ; Noch keinem Leaf zugeordnet -> in die aktive SnapArea einsortieren.
+    if (!target)
+        return false
+    SnapWindowToLeaf(hwnd, target.mon, target.leaf)
+    return true
+}
+
+; Vollscan ueber alle Fenster (Start, Resume). Im laufenden Betrieb reagiert der
+; Shell-Hook pro Fenster ueber AutoSnap_Window(), statt bei jeder Aktivierung
+; alle Fenster samt Blacklist-Regex durchzugehen.
+AutoSnap_NewlyStartedWindows() {
+    if (StateGet("ScriptPaused", false) || StateGet("DisplayChangePending", false))
+        return
+    target := AutoSnap_GetTarget()
+    if (!target)
+        return
     try {
         all := WinGetList()
     } catch Error as e {
         LogException(e, "AutoSnap_NewlyStartedWindows: WinGetList failed")
         return
     }
+    for hwnd in all
+        AutoSnap_ProcessWindow(hwnd, target)
+}
 
-    for hwnd in all {
-        if (!IsCollectibleSnapWindow(hwnd))
-            continue
-
-        ; Prozessname/Klasse ermitteln und ggf. Blacklist pruefen
-        try {
-            exe := WinGetProcessName("ahk_id " hwnd)
-        } catch {
-            exe := ""
-        }
-        try {
-            className := WinGetClass("ahk_id " hwnd)
-        } catch {
-            className := ""
-        }
-        try {
-            title := WinGetTitle("ahk_id " hwnd)
-        } catch {
-            title := ""
-        }
-        if ((exe || className || title) && IsBlacklistedExe(exe, className, title))
-            continue
-
-        ; Bereits einem Leaf zugeordnet? -> sicherstellen, dass es in seinem Leaf liegt.
-        if (WinToLeaf.Has(hwnd)) {
-            info := WinToLeaf[hwnd]
-            mon := info.mon
-            leaf := info.leaf
-            if (!Monitors_IsValid(mon) || !Layouts.Has(mon) || !Layouts[mon].nodes.Has(leaf))
-                continue ; Zuordnung veraltet (Monitor weg) -> wird vom Monitor-Handler bereinigt
-            ; Bewusst vergroesserte Fenster (Expand ueber Nachbar-Area, Maximiert) nicht
-            ; zurueckholen: ihre Mitte liegt zwangslaeufig ausserhalb des Leafs.
-            if (ExpandedWindows.Has(hwnd))
-                continue
-            try {
-                mm := WinGetMinMax("ahk_id " hwnd)
-            } catch {
-                mm := 0
-            }
-            if (mm = 1)
-                continue
-            r := GetLeafRectPx(mon, leaf)
-            try {
-                WinGetPos &x, &y, &w, &h, "ahk_id " hwnd
-            } catch {
-                continue
-            }
-            cx := x + (w / 2)
-            cy := y + (h / 2)
-            if (cx < r.L || cx > r.R || cy < r.T || cy > r.B) {
-                SnapWindowToLeaf(hwnd, mon, leaf)
-            }
-            continue
-        }
-
-        ; Noch keinem Leaf zugeordnet -> in die aktive SnapArea einsortieren.
-        SnapWindowToLeaf(hwnd, targetMon, targetLeaf)
+; Ein einzelnes Fenster (Shell-Hook: erstellt/aktiviert) einsortieren.
+AutoSnap_Window(hwnd) {
+    if (!hwnd)
+        return
+    if (StateGet("ScriptPaused", false) || StateGet("DisplayChangePending", false))
+        return
+    try {
+        if (!DllCall("IsWindow", "ptr", hwnd) || !WinExist("ahk_id " hwnd))
+            return
     }
+    catch Error as e {
+        return
+    }
+    target := AutoSnap_GetTarget()
+    AutoSnap_ProcessWindow(hwnd, target)
 }
 
 ; Bewegt ein Fenster in das Ziel-Leaf und aktualisiert das Mapping.

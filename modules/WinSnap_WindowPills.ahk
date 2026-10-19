@@ -226,29 +226,36 @@ WP_FormatBadgeCount(count) {
     }
 }
 
+; Icon-Cache pro Prozesspfad und Groesse. Ohne Cache wurde bei jedem Pill-Rebuild
+; fuer jedes Fenster das Icon erneut aus der EXE bzw. dem MSIX-Asset geladen.
+global WindowPillsIconCache := Map()  ; "exe|path|size" / "shell|path|size" -> {kind, h} oder 0
+
 WP_AddWindowIconPicture(g, targetHwnd, iconSize) {
+    global WindowPillsIconCache
     path := ""
     try path := WinGetProcessPath("ahk_id " targetHwnd)
 
-    ; MSIX/Store apps often keep their real icon in package PNG assets, not in the exe.
+    ; 1) MSIX-Asset oder EXE-Ressource (gecacht)
     if (path) {
-        pic := WP_TryAddMsixIconPicture(g, path, iconSize)
+        key := "exe|" path "|" iconSize
+        if (!WindowPillsIconCache.Has(key))
+            WindowPillsIconCache[key] := WP_LoadPathIcon(path, iconSize)
+        pic := WP_AddCachedIconPicture(g, WindowPillsIconCache[key], iconSize)
         if (IsObject(pic))
             return pic
     }
 
-    if (path && FileExist(path)) {
-        pic := WP_TryAddExeIconPicture(g, path, iconSize)
-        if (IsObject(pic))
-            return pic
-    }
-
+    ; 2) Icon des Fensters selbst (gehoert der App, nicht cachen)
     pic := WP_TryAddWindowHandleIconPicture(g, targetHwnd, iconSize)
     if (IsObject(pic))
         return pic
 
+    ; 3) Shell-Icon der Datei (gecacht)
     if (path && FileExist(path)) {
-        pic := WP_TryAddShellIconPicture(g, path, iconSize)
+        key := "shell|" path "|" iconSize
+        if (!WindowPillsIconCache.Has(key))
+            WindowPillsIconCache[key] := WP_LoadShellIcon(path, iconSize)
+        pic := WP_AddCachedIconPicture(g, WindowPillsIconCache[key], iconSize)
         if (IsObject(pic))
             return pic
     }
@@ -256,9 +263,51 @@ WP_AddWindowIconPicture(g, targetHwnd, iconSize) {
     return 0
 }
 
-WP_TryAddExeIconPicture(g, path, iconSize) {
+; Fuegt ein gecachtes Icon-Handle als Picture-Control hinzu ("*": AHK zerstoert das Handle nicht).
+WP_AddCachedIconPicture(g, entry, iconSize) {
+    if (!IsObject(entry) || !entry.h)
+        return 0
     try {
-        return g.AddPicture(Format("xm ym w{} h{} Icon1 BackgroundTrans", iconSize, iconSize), path)
+        return g.AddPicture(Format("xm ym w{} h{} BackgroundTrans", iconSize, iconSize), entry.kind ":*" entry.h)
+    }
+    catch Error as e {
+        return 0
+    }
+}
+
+; Laedt das Icon fuer einen Prozesspfad einmalig: MSIX-Asset (PNG) oder EXE-Icon.
+; Die Handles bleiben fuer die Laufzeit des Scripts erhalten.
+WP_LoadPathIcon(path, iconSize) {
+    ; MSIX/Store apps often keep their real icon in package PNG assets, not in the exe.
+    asset := ""
+    try asset := WP_GetMsixIconAsset(path, iconSize)
+    if (asset != "" && FileExist(asset)) {
+        try {
+            h := LoadPicture(asset, Format("w{} h{}", iconSize, iconSize), &imgType)
+            if (h)
+                return { kind:(imgType = 1 ? "HICON" : "HBITMAP"), h:h }
+        }
+    }
+    if (FileExist(path)) {
+        try {
+            h := LoadPicture(path, Format("Icon1 w{} h{}", iconSize, iconSize), &imgType)
+            if (h)
+                return { kind:(imgType = 1 ? "HICON" : "HBITMAP"), h:h }
+        }
+    }
+    return 0
+}
+
+WP_LoadShellIcon(path, iconSize) {
+    try {
+        sfiSize := A_PtrSize + 688
+        sfi := Buffer(sfiSize, 0)
+        flags := 0x100  ; SHGFI_ICON
+        flags |= (iconSize <= 16) ? 0x1 : 0x0  ; SHGFI_SMALLICON / SHGFI_LARGEICON
+        if (!DllCall("shell32\SHGetFileInfoW", "WStr", path, "UInt", 0, "Ptr", sfi.Ptr, "UInt", sfiSize, "UInt", flags, "Ptr"))
+            return 0
+        hIcon := NumGet(sfi, 0, "Ptr")
+        return hIcon ? { kind:"HICON", h:hIcon } : 0
     }
     catch Error as e {
         return 0
@@ -273,31 +322,6 @@ WP_TryAddWindowHandleIconPicture(g, hwnd, iconSize) {
         return g.AddPicture(Format("xm ym w{} h{} BackgroundTrans", iconSize, iconSize), "HICON:*" hIcon)
     }
     catch Error as e {
-        return 0
-    }
-}
-
-WP_TryAddShellIconPicture(g, path, iconSize) {
-    try {
-        sfiSize := A_PtrSize + 688
-        sfi := Buffer(sfiSize, 0)
-        flags := 0x100  ; SHGFI_ICON
-        flags |= (iconSize <= 16) ? 0x1 : 0x0  ; SHGFI_SMALLICON / SHGFI_LARGEICON
-        if (!DllCall("shell32\SHGetFileInfoW", "WStr", path, "UInt", 0, "Ptr", sfi.Ptr, "UInt", sfiSize, "UInt", flags, "Ptr"))
-            return 0
-        hIcon := NumGet(sfi, 0, "Ptr")
-        if (!hIcon)
-            return 0
-        pic := 0
-        try pic := g.AddPicture(Format("xm ym w{} h{} BackgroundTrans", iconSize, iconSize), "HICON:*" hIcon)
-        try DllCall("DestroyIcon", "Ptr", hIcon)
-        return IsObject(pic) ? pic : 0
-    }
-    catch Error as e {
-        try {
-            if (IsSet(hIcon) && hIcon)
-                DllCall("DestroyIcon", "Ptr", hIcon)
-        }
         return 0
     }
 }
@@ -324,18 +348,6 @@ WP_GetWindowIconHandle(hwnd) {
         }
     }
     return 0
-}
-
-WP_TryAddMsixIconPicture(g, processPath, iconSize) {
-    asset := WP_GetMsixIconAsset(processPath, iconSize)
-    if (asset = "" || !FileExist(asset))
-        return 0
-    try {
-        return g.AddPicture(Format("xm ym w{} h{} BackgroundTrans", iconSize, iconSize), asset)
-    }
-    catch Error as e {
-        return 0
-    }
 }
 
 WP_GetMsixIconAsset(processPath, iconSize) {

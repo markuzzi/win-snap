@@ -58,6 +58,7 @@ global AppState := {
     LoggingEnabled: true,
     LoggingLevel: 1,
     LoggingPath: A_ScriptDir "\WinSnap.log",
+    LoggingMaxBytes: 10485760,    ; Log-Rotation nach WinSnap.log.1 ab dieser Groesse (0 = aus)
     ScriptPaused: false,
     SnappedWindowsStatusPath: A_ScriptDir "\WinSnap_SnappedWindows.json",
     SnappedWindowsWritePending: false,

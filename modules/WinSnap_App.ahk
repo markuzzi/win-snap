@@ -282,8 +282,19 @@ ShellMessage_Handler(wParam, lParam, msg, hwnd) {
     if (StateGet("ScriptPaused", false))
         return 0
     try {
-        if (wParam = 1 || wParam = 4 || wParam = 0x8004) {
-            AutoSnap_NewlyStartedWindows()
+        if (wParam = 1) {
+            AutoSnap_Window(lParam)
+            ; Frisch erstellte Fenster haben oft noch keinen Titel/Rahmen -> kurz spaeter
+            ; noch einmal pruefen, falls keine Aktivierung folgt.
+            try {
+                SetTimer(AutoSnap_Window.Bind(lParam), -600)
+            }
+            catch Error as e {
+                LogException(e, "ShellMessage_Handler: retry timer failed")
+            }
+        } else if (wParam = 4 || wParam = 0x8004) {
+            ; Nur das aktivierte Fenster pruefen statt alle Fenster zu scannen
+            AutoSnap_Window(lParam)
         }
     }
     catch Error as e {
