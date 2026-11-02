@@ -48,6 +48,7 @@ HotkeyOverlay_BuildText() {
     lines.Push("Alt+Shift+A                    – Fenster in aktiver Area einsammeln")
     lines.Push("Ctrl+Alt+Win+A                 – Fenster in allen Areas einsammeln")
     lines.Push("Ctrl+Shift+Up/Down             – Fenster innerhalb Area wechseln")
+    lines.Push("Win+1..9                       – n-tes Fenster der Area aktivieren (ab 2 Fenstern)")
     lines.Push("Alt+Shift+Plus / Numpad+       – Vertikal teilen")
     lines.Push("Alt+Shift+Minus / Numpad-      – Horizontal teilen")
     lines.Push("Alt+Shift+Pfeile               – Grenze der Split-Gruppe verschieben")

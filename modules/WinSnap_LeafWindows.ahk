@@ -432,7 +432,9 @@ LeafCleanupList(key) {
 LeafAttachWindow(hwnd, mon, leafId, updateSelection := true) {
     global LeafWindows, WinToLeaf
     LogInfo(Format("LeafAttachWindow: hwnd={}, mon={}, leaf={}, updateSel={}", hwnd, mon, leafId, updateSelection))
-    LeafDetachWindow(hwnd, false)
+    ; Re-Snap in dieselbe Area: Anzeigeposition (Pill/Win+N) behalten
+    sameLeaf := (WinToLeaf.Has(hwnd) && WinToLeaf[hwnd].mon = mon && WinToLeaf[hwnd].leaf = leafId)
+    LeafDetachWindow(hwnd, false, sameLeaf)
     key := LeafKey(mon, leafId)
     if (!LeafWindows.Has(key))
         LeafWindows[key] := []
@@ -450,6 +452,7 @@ LeafAttachWindow(hwnd, mon, leafId, updateSelection := true) {
         idx++
     }
     arr.InsertAt(1, hwnd)
+    LeafDisplayOrder_Add(key, hwnd)
     WinToLeaf[hwnd] := { mon:mon, leaf:leafId }
     ; Ein (neues) Snappen beendet eine evtl. bestehende Expansion ueber Nachbar-Areas
     ExpandedWindows_Forget(hwnd)
@@ -475,7 +478,8 @@ LeafAttachWindow(hwnd, mon, leafId, updateSelection := true) {
 }
 
 ; Loest ein Fenster von seinem Leaf; optional Mapping entfernen.
-LeafDetachWindow(hwnd, removeMapping := false) {
+; keepDisplayOrder: Anzeigeposition behalten (nur fuer Re-Attach in dieselbe Area).
+LeafDetachWindow(hwnd, removeMapping := false, keepDisplayOrder := false) {
     global LeafWindows, WinToLeaf
     if (!WinToLeaf.Has(hwnd))
         return
@@ -495,6 +499,8 @@ LeafDetachWindow(hwnd, removeMapping := false) {
         if (arr.Length = 0)
             LeafWindows.Delete(key)
     }
+    if (!keepDisplayOrder)
+        LeafDisplayOrder_Remove(key, hwnd)
     if (removeMapping)
         WinToLeaf.Delete(hwnd)
 
@@ -599,3 +605,75 @@ LeafGetOrderedList(mon, leafId) {
     LeafCleanupList(key)
     return LeafWindows.Has(key) ? LeafWindows[key] : []
 }
+
+; --- Stabile Anzeigereihenfolge ----------------------------------------------
+; LeafWindows ist eine MRU-Liste (aktiviertes Fenster rutscht nach vorn). Fuer
+; Pills und Win+1..9 braucht es dagegen eine stabile Reihenfolge: neue Fenster
+; kommen hinten dran, bestehende behalten ihre Position/Nummer.
+global LeafDisplayOrder := Map()
+
+; Haengt hwnd ans Ende der Anzeigereihenfolge eines Leafs (falls noch nicht drin).
+LeafDisplayOrder_Add(key, hwnd) {
+    global LeafDisplayOrder
+    if (!LeafDisplayOrder.Has(key))
+        LeafDisplayOrder[key] := []
+    for h in LeafDisplayOrder[key] {
+        if (h = hwnd)
+            return
+    }
+    LeafDisplayOrder[key].Push(hwnd)
+}
+
+; Entfernt hwnd aus der Anzeigereihenfolge eines Leafs.
+LeafDisplayOrder_Remove(key, hwnd) {
+    global LeafDisplayOrder
+    if (!LeafDisplayOrder.Has(key))
+        return
+    order := LeafDisplayOrder[key]
+    idx := 1
+    while (idx <= order.Length) {
+        if (order[idx] = hwnd) {
+            order.RemoveAt(idx)
+            break
+        }
+        idx++
+    }
+    if (order.Length = 0)
+        LeafDisplayOrder.Delete(key)
+}
+
+; Liefert die Fenster eines Leafs in stabiler Anzeigereihenfolge (Kopie).
+; Gleicht sich selbst mit LeafWindows ab: verschwundene Fenster fliegen raus,
+; unbekannte (z.B. nach Restore/Reset) werden hinten angehaengt.
+LeafGetDisplayList(mon, leafId) {
+    global LeafDisplayOrder
+    arr := LeafGetOrderedList(mon, leafId)
+    key := LeafKey(mon, leafId)
+    if (arr.Length = 0) {
+        if (LeafDisplayOrder.Has(key))
+            LeafDisplayOrder.Delete(key)
+        return []
+    }
+    if (!LeafDisplayOrder.Has(key))
+        LeafDisplayOrder[key] := []
+    order := LeafDisplayOrder[key]
+    present := Map()
+    for h in arr
+        present[h] := true
+    idx := 1
+    while (idx <= order.Length) {
+        if (!present.Has(order[idx]))
+            order.RemoveAt(idx)
+        else
+            idx++
+    }
+    known := Map()
+    for h in order
+        known[h] := true
+    for h in arr {
+        if (!known.Has(h))
+            order.Push(h)
+    }
+    return order.Clone()
+}
+

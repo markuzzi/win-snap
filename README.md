@@ -47,8 +47,9 @@ Legend: `#` = Win, `!` = Alt, `^` = Ctrl, `+` = Shift
 - `!+a`: Collect all windows into the active snap area
 - `^#!a`: Collect windows across all snap areas (assign by intersection)
 - `^+Up` / `^+Down`: Cycle windows within the current leaf (prev/next)
-- `!+Plus` (top row or numpad): Split current leaf vertically
-- `!+Minus` (top row or numpad): Split current leaf horizontally
+- `#1` .. `#9` (top row or numpad): Activate the n-th window of the current leaf (same order as the pills); only intercepted while the leaf holds more than one window, otherwise Win+number reaches the Windows taskbar as usual
+- `!+Plus` (top row or numpad): Split current leaf vertically (active window moves into the new right half)
+- `!+Minus` (top row or numpad): Split current leaf horizontally (active window moves into the new bottom half)
 - `!+ArrowKeys`: Adjust boundary of the current split group
 - `^!h`: Toggle highlight overlay
 - `^!r`: Reload script

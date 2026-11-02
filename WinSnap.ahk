@@ -376,6 +376,29 @@ Esc:: {
 ^+Up::   CycleWindowInLeaf("prev")
 ^+Down:: CycleWindowInLeaf("next")
 
+; Win+1..9: n-tes Fenster der aktuellen Area aktivieren (Reihenfolge wie die Pills).
+; Nur aktiv, wenn die Area mehrere Fenster hat, sonst bleibt Win+Zahl bei Windows (Taskleiste).
+#HotIf !StateGet("ScriptPaused", false) && CurrentLeafHasMultipleWindows()
+#1::ActivateWindowInLeafByIndex(1)
+#2::ActivateWindowInLeafByIndex(2)
+#3::ActivateWindowInLeafByIndex(3)
+#4::ActivateWindowInLeafByIndex(4)
+#5::ActivateWindowInLeafByIndex(5)
+#6::ActivateWindowInLeafByIndex(6)
+#7::ActivateWindowInLeafByIndex(7)
+#8::ActivateWindowInLeafByIndex(8)
+#9::ActivateWindowInLeafByIndex(9)
+#Numpad1::ActivateWindowInLeafByIndex(1)
+#Numpad2::ActivateWindowInLeafByIndex(2)
+#Numpad3::ActivateWindowInLeafByIndex(3)
+#Numpad4::ActivateWindowInLeafByIndex(4)
+#Numpad5::ActivateWindowInLeafByIndex(5)
+#Numpad6::ActivateWindowInLeafByIndex(6)
+#Numpad7::ActivateWindowInLeafByIndex(7)
+#Numpad8::ActivateWindowInLeafByIndex(8)
+#Numpad9::ActivateWindowInLeafByIndex(9)
+#HotIf !StateGet("ScriptPaused", false)
+
 ; ALT+SHIFT + PLUS → vertikal teilen (Top-Row + Numpad)
 !+vkBB::      SplitCurrentLeaf("v")  ; VK_OEM_PLUS
 !+NumpadAdd:: SplitCurrentLeaf("v")

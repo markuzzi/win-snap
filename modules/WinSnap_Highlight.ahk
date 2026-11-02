@@ -132,11 +132,9 @@ UpdateActiveHighlight(*) {
         LogError("UpdateActiveHighlight: DragSnap check failed")
     }
     manual := GetManualNavigationContext()
-    if (manual.mon) {
+    if (manual.mon)
         ApplyLeafHighlight(manual.mon, manual.leaf)
-        return
-    }
-    if (WindowSearch.active)
+    else if (WindowSearch.active)
         return
     try {
         hwnd := WinGetID("A")
@@ -147,7 +145,8 @@ UpdateActiveHighlight(*) {
         return
     ; Fokuswechsel: einmal Pills aktualisieren (aktive Pill/Rahmen), statt in
     ; jedem Tick. SelectLeaf/LeafRecordActivation invalidieren nur bei echten
-    ; Aenderungen der Auswahl bzw. Reihenfolge.
+    ; Aenderungen der Auswahl bzw. Reihenfolge. Laeuft auch bei manueller
+    ; Navigation, sonst bleibt der Pill-Rahmen nach Alt+Pfeil/Pill-Klick stehen.
     static lastActive := 0
     if (hwnd != lastActive) {
         lastActive := hwnd
@@ -158,6 +157,9 @@ UpdateActiveHighlight(*) {
             LogException(e, "UpdateActiveHighlight: WindowPills_Invalidate failed")
         }
     }
+    ; Manuelle Navigation: Auswahl nicht vom aktiven Fenster ueberschreiben lassen
+    if (manual.mon)
+        return
     if (WinToLeaf.Has(hwnd))
         LeafRecordActivation(hwnd)
     else {

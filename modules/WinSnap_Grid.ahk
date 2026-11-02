@@ -250,16 +250,18 @@ SplitCurrentLeaf(orient) {
     if (!nAfter)
         return
     leftOrTop := nAfter.a
-    SelectLeaf(mon, leftOrTop, "manual")
-    if (!wasEmpty) {
-        ; Move all windows of the previous area into the new left/top leaf
+    rightOrBottom := nAfter.b
+    if (wasEmpty) {
+        SelectLeaf(mon, leftOrTop, "manual")
+    } else {
+        ; Die uebrigen Fenster bleiben in der alten (linken/oberen) Area ...
+        rMove := GetLeafRectPx(mon, leftOrTop)
         for w in prevWindows {
             if (w = hwnd)
                 continue
             try {
                 if (DllCall("IsWindow", "ptr", w) && WinExist("ahk_id " w)) {
                     EnsureHistory(w)
-                    rMove := GetLeafRectPx(mon, leftOrTop)
                     MoveWindow(w, rMove.L, rMove.T, rMove.R - rMove.L, rMove.B - rMove.T)
                     LeafAttachWindow(w, mon, leftOrTop, false)
                 }
@@ -268,9 +270,10 @@ SplitCurrentLeaf(orient) {
                 LogException(e, "SplitCurrentLeaf: moving window into left/top failed")
             }
         }
-        ; Active window last to set highlight and ordering
-        SnapToLeaf(hwnd, mon, leftOrTop)
-        LastDir[hwnd] := (orient = "v") ? "left" : "top"
+        ; ... das aktive Fenster wandert in die neue (rechte/untere) Area.
+        SelectLeaf(mon, rightOrBottom, "manual")
+        SnapToLeaf(hwnd, mon, rightOrBottom)
+        LastDir[hwnd] := (orient = "v") ? "right" : "bottom"
     }
 
     try {
@@ -436,6 +439,7 @@ SwitchSnapArea(dir) {
             WinActivate "ahk_id " target
         else
             FlashLeafOutline(ctx.mon, neighbor)
+        SwitchSnapArea_RefreshPills()
         return
     }
     nextMon := FindNeighborMonitor(ctx.mon, dir)
@@ -453,6 +457,19 @@ SwitchSnapArea(dir) {
         WinActivate "ahk_id " target
     else
         FlashLeafOutline(nextMon, leaf)
+    SwitchSnapArea_RefreshPills()
+}
+
+; Pill-Rahmen sofort und nochmals nach dem Fokuswechsel nachziehen: SelectLeaf
+; invalidiert nur bei geaenderter Auswahl und laeuft vor WinActivate.
+SwitchSnapArea_RefreshPills() {
+    try {
+        WindowPills_Invalidate()
+        SetTimer(WindowPills_Invalidate, -120)
+    }
+    catch Error as e {
+        LogException(e, "SwitchSnapArea_RefreshPills: WindowPills_Invalidate failed")
+    }
 }
 
 ; Findet den naechsten Monitor in Bewegungsrichtung.
@@ -509,7 +526,8 @@ CycleWindowInLeaf(direction) {
     if (!WinToLeaf.Has(hwnd))
         return
     info := WinToLeaf[hwnd]
-    arr := LeafGetOrderedList(info.mon, info.leaf)
+    ; Entlang der Pill-Reihenfolge (stabil), nicht entlang der MRU-Liste
+    arr := LeafWindowsForIndexAccess(info.mon, info.leaf)
     if (arr.Length <= 1)
         return
     idx := 0
@@ -527,9 +545,6 @@ CycleWindowInLeaf(direction) {
         idx := (idx = 1) ? arr.Length : idx - 1
     target := arr[idx]
     if (WinExist("ahk_id " target)) {
-        ; Unterdruecke reorder in LeafRecordActivation waehrend des Cycle-Aktivierens
-        global SuppressActivationReorder
-        SuppressActivationReorder := true
         WinActivate "ahk_id " target
         try {
             ; Force a fast pills refresh so active-border follows cycle immediately.
@@ -539,25 +554,64 @@ CycleWindowInLeaf(direction) {
         catch Error as e {
             LogException(e, "CycleWindowInLeaf: WindowPills_Invalidate failed")
         }
-        ; Nach kurzer Zeit wieder freigeben (Ticker fuer Highlight laeuft alle ~150ms)
-        try {
-            SetTimer(ClearCycleReorderSuppression, -250)
-        }
-        catch Error as e {
-            LogError("CycleWindowInLeaf: SetTimer failed")
-        }
     }
     LogInfo(Format("CycleWindowInLeaf: direction={}, activated hwnd={}", direction, target))
 }
 
-ClearCycleReorderSuppression(*) {
+; Fenster einer Area in Pill-Reihenfolge, ohne per Pill-Blacklist versteckte
+; Fenster. Damit entspricht Win+N genau der n-ten sichtbaren Pill.
+LeafWindowsForIndexAccess(mon, leafId) {
+    out := []
+    for hwnd in LeafGetDisplayList(mon, leafId) {
+        hClass := "", title := ""
+        try hClass := WinGetClass("ahk_id " hwnd)
+        try title := WinGetTitle("ahk_id " hwnd)
+        if (IsPillBlacklisted(hClass, title))
+            continue
+        out.Push(hwnd)
+    }
+    return out
+}
+
+; HotIf-Bedingung fuer Win+1..9: true, wenn die aktuelle SnapArea mehr als ein Fenster hat.
+; Sonst bleibt der Hotkey inaktiv und Win+Zahl geht wie gewohnt an die Taskleiste.
+CurrentLeafHasMultipleWindows() {
     try {
-        global SuppressActivationReorder
-        SuppressActivationReorder := false
+        ctx := ApplyManualNavigation(GetLeafNavigationContext())
+        if (!ctx.mon || !ctx.leaf)
+            return false
+        return LeafGetOrderedList(ctx.mon, ctx.leaf).Length > 1
     }
     catch Error as e {
-        LogError("ClearCycleReorderSuppression: failed")
+        LogException(e, "CurrentLeafHasMultipleWindows failed")
+        return false
     }
+}
+
+; Win+1..9: Aktiviert das n-te Fenster der aktuellen SnapArea (Reihenfolge wie die Pills).
+ActivateWindowInLeafByIndex(index) {
+    if (index < 1)
+        return
+    ctx := ApplyManualNavigation(GetLeafNavigationContext())
+    if (!ctx.mon || !ctx.leaf)
+        return
+    arr := LeafWindowsForIndexAccess(ctx.mon, ctx.leaf)
+    if (index > arr.Length) {
+        DebugLog(Format("ActivateWindowInLeafByIndex: index={} > count={} (mon={}, leaf={})", index, arr.Length, ctx.mon, ctx.leaf))
+        return
+    }
+    target := arr[index]
+    if (!WinExist("ahk_id " target))
+        return
+    WinActivate "ahk_id " target
+    try {
+        WindowPills_Invalidate()
+        SetTimer(WindowPills_Invalidate, -120)
+    }
+    catch Error as e {
+        LogException(e, "ActivateWindowInLeafByIndex: WindowPills_Invalidate failed")
+    }
+    LogInfo(Format("ActivateWindowInLeafByIndex: index={}, activated hwnd={}", index, target))
 }
 
 ; Entfernt die aktuelle Leaf-Area und promoted das Geschwister (Fenster werden umgezogen).

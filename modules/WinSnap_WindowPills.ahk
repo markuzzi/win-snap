@@ -782,6 +782,9 @@ WindowPills_Update() {
         if (!activeHwnd)
             activeHwnd := topByLeaf.Has(key) ? topByLeaf[key] : LeafGetTopWindow(mon, leafId)
 
+        ; Stabile Reihenfolge (neue Fenster hinten), identisch zu Win+1..9
+        arr := LeafGetDisplayList(mon, leafId)
+
         ; Placement parameters
         global WindowPillsMarginX, WindowPillsMarginY, WindowPillsGap
         maxX := r.R - WindowPillsMarginX  ; right bound for wrapping
@@ -1071,6 +1074,10 @@ WP_OnPillClick(targetHwnd) {
                 SelectLeaf(info.mon, info.leaf, "manual")
             }
             WinActivate "ahk_id " targetHwnd
+            ; Rahmen sofort und nach dem Fokuswechsel nachziehen (SelectLeaf
+            ; invalidiert nur bei geaenderter Auswahl, und zu frueh fuer WinActivate)
+            WindowPills_Invalidate()
+            SetTimer(WindowPills_Invalidate, -120)
         }
     }
     catch Error as e {
@@ -1333,10 +1340,17 @@ WP_RefreshActiveStyles() {
             st := WinToLeaf[sysActive]
             activeMap[st.mon ":" st.leaf] := sysActive
         }
-        ; Determine the currently active SnapArea (prefer focused window's monitor/selection)
+        ; Determine the currently active SnapArea. Manuelle Navigation (Alt+Pfeil,
+        ; Pill-Klick) hat Vorrang: direkt nach SelectLeaf ist das aktive Fenster oft
+        ; noch das alte (ggf. auf einem anderen Monitor), die Auswahl dort stimmt
+        ; dann nicht mehr.
         activeAreaMon := 0
         activeAreaLeaf := 0
-        if (sysActive && WinToLeaf.Has(sysActive)) {
+        manual := GetManualNavigationContext()
+        if (manual.mon && manual.leaf) {
+            activeAreaMon := manual.mon
+            activeAreaLeaf := manual.leaf
+        } else if (sysActive && WinToLeaf.Has(sysActive)) {
             ai := WinToLeaf[sysActive]
             activeAreaMon := ai.mon
             selected := GetSelectedLeaf(ai.mon)
