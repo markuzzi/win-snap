@@ -70,6 +70,12 @@ App_Startup() {
     catch Error as e {
         LogException(e, "App_Startup: WindowPills_StartBadgeRefresh failed")
     }
+    try {
+        FocusMode_Start()
+    }
+    catch Error as e {
+        LogException(e, "App_Startup: FocusMode_Start failed")
+    }
     ShowTrayTip("WinSnap geladen - Layouts bereit", 1500)
 }
 App_OnExit(exitReason, exitCode) {
@@ -98,6 +104,12 @@ TogglePause() {
     }
     catch Error as e {
         LogError("TogglePause: SetTimer(UpdateActiveHighlight) failed")
+    }
+    try {
+        FocusMode_OnPause(newState)
+    }
+    catch Error as e {
+        LogException(e, "TogglePause: FocusMode_OnPause failed")
     }
     if (newState) {
         try {

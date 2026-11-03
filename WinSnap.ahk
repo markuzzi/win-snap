@@ -126,6 +126,16 @@ global WindowPillsOnDemandOnly := false       ; true = update only when layout/s
 global WindowPillsMinRebuildInterval := 250   ; ms guard between full rebuilds
 global WindowPillsReserveChangeTolerance := 2  ; px; only reapply if change >= tolerance
 
+; Focus Mode (inaktive Fenster abdunkeln) - Toggle: Ctrl+Alt+F
+global FocusModeEnabled := false     ; beim Start aktiv?
+global FocusModeOpacity := 180       ; 0..255 Deckkraft der Abdunkelung
+global FocusModeColor := "Black"     ; Farbe der Abdunkelung
+global FocusModeInterval := 60       ; ms; Nachfuehren der Loecher (aktives Fenster/Popups)
+; Zen Mode (inaktive Fenster komplett ausblenden) - Toggle: Ctrl+Alt+Z
+global ZenModeEnabled := false       ; beim Start aktiv? (hat Vorrang vor FocusModeEnabled)
+global ZenModeOpacity := 255         ; 0..255; 255 = inaktive Fenster unsichtbar
+global ZenModeColor := "Black"       ; Hintergrundfarbe im Zen Mode
+
 ; --- AppState Helper --------------------------------------------------------
 StateGet(key, default := "") {
     global AppState
@@ -173,6 +183,7 @@ StateToggle(key, default := false) {
 #Include ".\modules\WinSnap_DragSnap.ahk"
 #Include ".\modules\WinSnap_WindowPills.ahk"
 #Include ".\modules\WinSnap_DragResize.ahk"
+#Include ".\modules\WinSnap_Focus.ahk"        ; Focus Mode: inaktive Fenster abdunkeln
 #Include ".\modules\WinSnap_App.ahk"
 
 App_Startup()
@@ -466,6 +477,16 @@ Esc:: {
 ; Toggle Window Pills overlay
 ^!w:: {
     WindowPills_Toggle()
+}
+
+; Ctrl+Alt+F: Focus Mode (inaktive Fenster abdunkeln) an/aus
+^!f:: {
+    FocusMode_Toggle()
+}
+
+; Ctrl+Alt+Z: Zen Mode (inaktive Fenster komplett ausblenden) an/aus
+^!z:: {
+    ZenMode_Toggle()
 }
 
 ; Ctrl+Alt+B: aktives Fenster fuer AutoSnap blacklisten/de-blacklisten

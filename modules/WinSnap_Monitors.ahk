@@ -382,6 +382,7 @@ Monitors_ApplyChange() {
             ManualNav_Clear()
     }
     try HideHighlight()
+    try FocusMode_Rebuild()
 
     ; --- Sonstige index-basierte Caches ---------------------------------------
     newReserve := Map()

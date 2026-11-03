@@ -55,6 +55,8 @@ Legend: `#` = Win, `!` = Alt, `^` = Ctrl, `+` = Shift
 - `^!r`: Reload script
 - `^!/?`: Toggle hotkey overlay while held (vkBF)
 - `^!w`: Toggle window pills overlay
+- `^!f`: Toggle focus mode (dims all windows except the active one and its popups; WinSnap overlays stay undimmed)
+- `^!z`: Toggle zen mode (same as focus mode, but inactive windows are hidden completely; pressing the other hotkey switches modes)
 - `^!b`: Open AutoSnap blacklist menu for the active window (process+class, class, title RegEx, class+title RegEx)
 - `^!p`: Pause/resume hotkeys and timers
 - `^!q`: Quit script
@@ -83,6 +85,8 @@ Most defaults live near the top of `WinSnap.ahk` and control split behavior, ove
 
 - `DefaultSplitX`, `DefaultSplitY`, `SplitStep`, `MinFrac`, `MaxFrac`, `SnapGap`
 - Highlight: `HighlightEnabled`, `BorderPx`
+- Focus mode: `FocusModeEnabled`, `FocusModeOpacity`, `FocusModeColor`, `FocusModeInterval`
+- Zen mode: `ZenModeEnabled`, `ZenModeOpacity`, `ZenModeColor`
 - Window pills: `WindowPillsEnabled`, `WindowPillsMaxTitle`, `WindowPillsOpacity`, `WindowPillsFont`, `WindowPillsFontSize`, `WindowPillsShowIcons`, etc.
 - Logging: `LoggingEnabled`, `LoggingLevel`, `LoggingPath`
 

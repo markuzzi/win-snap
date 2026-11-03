@@ -58,6 +58,8 @@ HotkeyOverlay_BuildText() {
     lines.Push("Ctrl+Alt+Q                     – Script beenden")
     lines.Push("Ctrl+Alt+R                     – Script neu laden")
     lines.Push("Ctrl+Alt+W                     – Fenster-Pills anzeigen/verbergen")
+    lines.Push("Ctrl+Alt+F                     – Focus Mode (inaktive Fenster abdunkeln)")
+    lines.Push("Ctrl+Alt+Z                     – Zen Mode (inaktive Fenster ausblenden)")
     lines.Push("Win+Ctrl+Alt+<num>             – Switch Default Layouts")
     lines.Push("Win+Ctrl+Alt+0                 – Switch to Default 50/50 Layout")
     lines.Push("")
