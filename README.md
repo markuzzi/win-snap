@@ -17,6 +17,10 @@ The script organizes each monitor into “leaves” (snap areas) that you can sp
 - Multi-monitor hotplug handling: unplugging/replugging monitors re-keys all state, parks the layout of the missing monitor and restores it (including displaced windows) when it returns
 - Logging to `WinSnap.log` for troubleshooting
 
+## Versioning
+
+Releases are tagged in git (`v1.0.0` and up). The running version is shown in the tray tooltip and in the hotkey overlay (`WinSnapVersion` in `WinSnap.ahk`).
+
 ## Requirements
 
 - Windows 10/11

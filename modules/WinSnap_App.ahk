@@ -76,7 +76,7 @@ App_Startup() {
     catch Error as e {
         LogException(e, "App_Startup: FocusMode_Start failed")
     }
-    ShowTrayTip("WinSnap geladen - Layouts bereit", 1500)
+    ShowTrayTip("WinSnap " WinSnapVersion " geladen - Layouts bereit", 1500)
 }
 App_OnExit(exitReason, exitCode) {
     try {
@@ -213,7 +213,7 @@ InitTrayIcon() {
 
 ; Aktualisiert den Tray-Tooltip basierend auf dem Pausenstatus.
 UpdateTrayTooltip() {
-    tip := StateGet("ScriptPaused", false) ? "WinSnap - Pausiert" : "WinSnap - Aktiv"
+    tip := "WinSnap " WinSnapVersion (StateGet("ScriptPaused", false) ? " - Pausiert" : " - Aktiv")
     try {
         A_IconTip := tip
     }

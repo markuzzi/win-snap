@@ -22,7 +22,7 @@ HotkeyOverlay_Init() {
     fontTitle := "s16 cWhite Bold"
     fontItem := "s12 cWhite"
     g.SetFont(fontTitle, "Segoe UI")
-    g.AddText("xm ym", "WinSnap Shortcuts")
+    g.AddText("xm ym", "WinSnap " WinSnapVersion " - Shortcuts")
     ; Monospace for aligned columns
     g.SetFont(fontItem, "Consolas")
     ; Dynamischer Inhalt (Text statt Edit; BackgroundTrans wird hier unterstützt)

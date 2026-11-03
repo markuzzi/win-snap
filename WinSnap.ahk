@@ -6,6 +6,8 @@
 SendMode "Input"
 SetWinDelay 0
 
+global WinSnapVersion := "1.0.0"
+
 ; =========================
 ; Konfiguration
 ; =========================
