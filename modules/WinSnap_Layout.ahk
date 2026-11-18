@@ -25,7 +25,7 @@ Layout_Ensure(mon) {
         return
     nodes := Map()
     nodes[1] := { id:1, parent:0, split:"", frac:0.5, a:0, b:0 }  ; root unsplittet
-    Layouts[mon] := { root:1, next:2, nodes:nodes }
+    Layouts[mon] := { root:1, next:2, nodes:nodes, preset:"" }
     Layout_SaveAll()
     LogInfo(Format("Layout_Ensure: initialized layout for monitor {}", mon))
 }
@@ -70,6 +70,7 @@ Layout_SplitLeaf(mon, leafId, orient) {
     n.frac  := 0.5
     n.a := idA
     n.b := idB
+    Layouts[mon].preset := ""   ; Struktur geaendert -> kein Standard-Preset mehr
     Layout_SaveAll()
 }
 
@@ -231,6 +232,7 @@ Layout_RemoveLeaf(mon, leafId) {
     leaf := nodes[leafId]
     if (leaf.parent = 0)
         return 0
+    Layouts[mon].preset := ""   ; Struktur geaendert -> kein Standard-Preset mehr
     parentId := leaf.parent
     parent := nodes[parentId]
     siblingId := (parent.a = leafId) ? parent.b : parent.a
@@ -608,6 +610,7 @@ Layout_SerializeMonitor(layout) {
     layoutMap["root"] := layout.root
     layoutMap["next"] := layout.next
     layoutMap["nodes"] := nodes
+    layoutMap["preset"] := layout.HasOwnProp("preset") ? String(layout.preset) : ""
     return layoutMap
 }
 
@@ -630,7 +633,8 @@ Layout_DeserializeMonitor(layoutMap) {
     return {
         root: Layout_ToInt(layoutMap.Has("root") ? layoutMap["root"] : 1, 1),
         next: Layout_ToInt(layoutMap.Has("next") ? layoutMap["next"] : (nodes.Count + 1), nodes.Count + 1),
-        nodes: nodes
+        nodes: nodes,
+        preset: layoutMap.Has("preset") ? String(layoutMap["preset"]) : ""
     }
 }
 

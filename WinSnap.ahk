@@ -182,6 +182,9 @@ StateToggle(key, default := false) {
 #Include ".\modules\WinSnap_WindowSearch.ahk"
 #Include ".\modules\WinSnap_Grid.ahk"
 #Include ".\modules\WinSnap_HotkeyOverlay.ahk"
+#Include ".\modules\WinSnap_LayoutPresets.ahk" ; Preset-Tabelle (Ctrl+Alt+Win+Taste)
+#Include ".\modules\WinSnap_PresetMemory.ahk"  ; Fensterzuordnung je Preset merken/wiederherstellen
+#Include ".\modules\WinSnap_LayoutOverlay.ahk" ; Layout-Uebersicht (Ctrl+Alt+Win+#)
 #Include ".\modules\WinSnap_DragSnap.ahk"
 #Include ".\modules\WinSnap_WindowPills.ahk"
 #Include ".\modules\WinSnap_DragResize.ahk"
@@ -190,16 +193,103 @@ StateToggle(key, default := false) {
 
 App_Startup()
 
-ApplyLayoutPreset(presetName, applyFn) {
-    applyFn.Call()
-    CollectWindowsInAllLeaves()
-    LogInfo(Format("Preset: {} + collect", presetName))
+; =========================
+; Hotkey-Funktionen (auch aus dem Hotkey-Overlay per Klick aufrufbar)
+; =========================
+
+; Win+Shift+Up: maximieren + Pills hinter das Fenster legen
+MaximizeActiveWindow() {
+    global MaximizeRestoreState, WinToLeaf
+    win := GetActiveWindow()
+    if (!win)
+        return
+    hwnd := win.hwnd
+
+    snapped := false
+    mon := 0
+    leaf := 0
+    if (WinToLeaf.Has(hwnd)) {
+        info := WinToLeaf[hwnd]
+        snapped := true
+        mon := info.mon
+        leaf := info.leaf
+    }
+    MaximizeRestoreState[hwnd] := { snapped:snapped, mon:mon, leaf:leaf }
+
+    try {
+        WindowPills_SendBehindWindow(hwnd)
+    }
+    catch Error as e {
+        LogException(e, "MaximizeActiveWindow: WindowPills_SendBehindWindow failed")
+    }
+
+    try {
+        WinMaximize "ahk_id " hwnd
+    }
+    catch Error as e {
+        ; Fallback fuer Fenster/Apps, die WinMaximize ignorieren.
+        monInfo := GetMonitorIndexAndArea(hwnd)
+        MoveWindow(hwnd, monInfo.left, monInfo.top, monInfo.right - monInfo.left, monInfo.bottom - monInfo.top)
+    }
 }
 
-ApplyPreset5050AllMonitors() {
-    count := MonitorGetCount()
-    Loop count {
-        Layout_SetMonitorColumns(A_Index, [1, 1])
+; Win+Shift+Down: restore; bei gesnappten Fenstern zur alten Snap-Area zurueck
+RestoreActiveWindow() {
+    global MaximizeRestoreState
+    win := GetActiveWindow()
+    if (!win)
+        return
+    hwnd := win.hwnd
+    restoredToLeaf := false
+
+    if (MaximizeRestoreState.Has(hwnd)) {
+        st := MaximizeRestoreState[hwnd]
+        if (st.snapped && st.mon && st.leaf) {
+            try {
+                Layout_Ensure(st.mon)
+                if (Layout_Node(st.mon, st.leaf)) {
+                    SnapToLeaf(hwnd, st.mon, st.leaf)
+                    restoredToLeaf := true
+                }
+            }
+            catch Error as e {
+                LogException(e, "RestoreActiveWindow: SnapToLeaf restore failed")
+            }
+        }
+        MaximizeRestoreState.Delete(hwnd)
+    }
+
+    if (!restoredToLeaf) {
+        try {
+            if (WinGetMinMax("ahk_id " hwnd) = 1)
+                WinRestore "ahk_id " hwnd
+        }
+        catch Error as e {
+            LogException(e, "RestoreActiveWindow: WinRestore failed")
+        }
+    }
+
+    try {
+        WindowPills_BringToFront()
+    }
+    catch Error as e {
+        LogException(e, "RestoreActiveWindow: WindowPills_BringToFront failed")
+    }
+}
+
+; Ctrl+Alt+H: Highlight der aktiven Area an/aus
+ToggleHighlight() {
+    global CurrentLeafSelection
+    enabled := StateToggle("HighlightEnabled", false)
+    if (!enabled)
+        HideHighlight()
+    else {
+        for mon, state in CurrentLeafSelection {
+            if (state.leaf) {
+                ApplyLeafHighlight(mon, state.leaf)
+                break
+            }
+        }
     }
 }
 
@@ -211,6 +301,44 @@ ApplyPreset5050AllMonitors() {
 ^!p:: {
     TogglePause()
 }
+
+; Layout-Overlay offen: blosse Preset-Taste wendet das Layout an, Esc schliesst
+#HotIf !StateGet("ScriptPaused", false) && LayoutOverlay.shown
+1::LayoutOverlay_Pick("1")
+2::LayoutOverlay_Pick("2")
+3::LayoutOverlay_Pick("3")
+4::LayoutOverlay_Pick("4")
+5::LayoutOverlay_Pick("5")
+6::LayoutOverlay_Pick("6")
+7::LayoutOverlay_Pick("7")
+0::LayoutOverlay_Pick("0")
+Numpad1::LayoutOverlay_Pick("1")
+Numpad2::LayoutOverlay_Pick("2")
+Numpad3::LayoutOverlay_Pick("3")
+Numpad4::LayoutOverlay_Pick("4")
+Numpad5::LayoutOverlay_Pick("5")
+Numpad6::LayoutOverlay_Pick("6")
+Numpad7::LayoutOverlay_Pick("7")
+Numpad0::LayoutOverlay_Pick("0")
+Up::LayoutOverlay_MoveSelection(0, -1)
+Down::LayoutOverlay_MoveSelection(0, 1)
+Left::LayoutOverlay_MoveSelection(-1, 0)
+Right::LayoutOverlay_MoveSelection(1, 0)
+Enter::LayoutOverlay_Confirm()
+NumpadEnter::LayoutOverlay_Confirm()
+Esc::LayoutOverlay_Hide()
+#HotIf
+
+; Hotkey-Overlay offen: Pfeiltasten waehlen eine klickbare Zeile, Enter fuehrt aus, Esc schliesst
+#HotIf HotkeyOverlay.shown
+Up::HotkeyOverlay_MoveSelection(-1)
+Down::HotkeyOverlay_MoveSelection(1)
+Left::HotkeyOverlay_SwitchColumn()
+Right::HotkeyOverlay_SwitchColumn()
+Enter::HotkeyOverlay_Confirm()
+NumpadEnter::HotkeyOverlay_Confirm()
+Esc::HotkeyOverlay_Toggle()
+#HotIf
 
 #HotIf !StateGet("ScriptPaused", false) && WindowSearch.active
 Up:: {
@@ -266,84 +394,10 @@ Esc:: {
 #^Numpad0::SnapActiveWindowToNumberedArea(10)
 
 ; Win+Shift+Up: maximieren + Pills hinter das Fenster legen
-#+Up:: {
-    global MaximizeRestoreState, WinToLeaf
-    win := GetActiveWindow()
-    if (!win)
-        return
-    hwnd := win.hwnd
-
-    snapped := false
-    mon := 0
-    leaf := 0
-    if (WinToLeaf.Has(hwnd)) {
-        info := WinToLeaf[hwnd]
-        snapped := true
-        mon := info.mon
-        leaf := info.leaf
-    }
-    MaximizeRestoreState[hwnd] := { snapped:snapped, mon:mon, leaf:leaf }
-
-    try {
-        WindowPills_SendBehindWindow(hwnd)
-    }
-    catch Error as e {
-        LogException(e, "Hotkey #+Up: WindowPills_SendBehindWindow failed")
-    }
-
-    try {
-        WinMaximize "ahk_id " hwnd
-    }
-    catch Error as e {
-        ; Fallback fuer Fenster/Apps, die WinMaximize ignorieren.
-        monInfo := GetMonitorIndexAndArea(hwnd)
-        MoveWindow(hwnd, monInfo.left, monInfo.top, monInfo.right - monInfo.left, monInfo.bottom - monInfo.top)
-    }
-}
+#+Up::MaximizeActiveWindow()
 
 ; Win+Shift+Down: restore; bei gesnappten Fenstern zur alten Snap-Area zurueck
-#+Down:: {
-    global MaximizeRestoreState
-    win := GetActiveWindow()
-    if (!win)
-        return
-    hwnd := win.hwnd
-    restoredToLeaf := false
-
-    if (MaximizeRestoreState.Has(hwnd)) {
-        st := MaximizeRestoreState[hwnd]
-        if (st.snapped && st.mon && st.leaf) {
-            try {
-                Layout_Ensure(st.mon)
-                if (Layout_Node(st.mon, st.leaf)) {
-                    SnapToLeaf(hwnd, st.mon, st.leaf)
-                    restoredToLeaf := true
-                }
-            }
-            catch Error as e {
-                LogException(e, "Hotkey #+Down: SnapToLeaf restore failed")
-            }
-        }
-        MaximizeRestoreState.Delete(hwnd)
-    }
-
-    if (!restoredToLeaf) {
-        try {
-            if (WinGetMinMax("ahk_id " hwnd) = 1)
-                WinRestore "ahk_id " hwnd
-        }
-        catch Error as e {
-            LogException(e, "Hotkey #+Down: WinRestore failed")
-        }
-    }
-
-    try {
-        WindowPills_BringToFront()
-    }
-    catch Error as e {
-        LogException(e, "Hotkey #+Down: WindowPills_BringToFront failed")
-    }
-}
+#+Down::RestoreActiveWindow()
 
 ; Win+Shift+Right: Fenster auf rechte Nachbar-Area erweitern
 #+Right:: {
@@ -427,27 +481,19 @@ Esc:: {
 !+Down::  AdjustBoundaryForActive("Down")
 
 ; Highlight toggeln
-^!h:: {
-    global CurrentLeafSelection
-    enabled := StateToggle("HighlightEnabled", false)
-    if (!enabled)
-        HideHighlight()
-    else {
-        for mon, state in CurrentLeafSelection {
-            if (state.leaf) {
-                ApplyLeafHighlight(mon, state.leaf)
-                break
-            }
-        }
-    }
-}
+^!h::ToggleHighlight()
 
 ; Reload-Hotkey
 ^!r::Reload()
 
-; Hotkey Overlay (anzeigen solange gedrückt) – Ctrl+Alt+/? (vkBF)
+; Hotkey Overlay an/aus - Ctrl+Alt+# (vkBF, auf US-Layout /?)
 ^!vkBF:: {
     HotkeyOverlay_Toggle()
+}
+
+; Layout-Overlay an/aus - Ctrl+Alt+Win+# (Vorschau aller Presets + aktuelles Layout)
+^#!vkBF:: {
+    LayoutOverlay_Toggle()
 }
 
 ; =========================
@@ -504,53 +550,16 @@ Esc:: {
 
 ; =========================
 ; Layout Preset Hotkeys (pro aktueller Monitor)
+; Definition der Presets: modules\WinSnap_LayoutPresets.ahk
+; Vorschau aller Presets: Ctrl+Alt+Win+# (LayoutOverlay)
 ; =========================
-
-; Alt+Ctrl+Win+1: Fullscreen (ein Leaf)
-^#!1:: {
-    mon := GetCurrentMonitorIndex()
-    ApplyLayoutPreset(Format("Fullscreen on mon={}", mon), (*) => Layout_ResetMonitor(mon))
-}
-
-; Alt+Ctrl+Win+2: 50/50 vertikal
-^#!2:: {
-    mon := GetCurrentMonitorIndex()
-    ApplyLayoutPreset(Format("50/50 on mon={}", mon), (*) => Layout_SetMonitorColumns(mon, [1, 1]))
-}
-
-; Alt+Ctrl+Win+3: 33/33/33 vertikal
-^#!3:: {
-    mon := GetCurrentMonitorIndex()
-    ApplyLayoutPreset(Format("33/33/33 on mon={}", mon), (*) => Layout_SetMonitorColumns(mon, [1, 1, 1]))
-}
-
-; Alt+Ctrl+Win+4: 2x2 Quadranten
-^#!4:: {
-    mon := GetCurrentMonitorIndex()
-    ApplyLayoutPreset(Format("Quadrants on mon={}", mon), (*) => Layout_SetMonitorQuadrants(mon))
-}
-
-; Alt+Ctrl+Win+5: 25/50/25 vertikal
-^#!5:: {
-    mon := GetCurrentMonitorIndex()
-    ApplyLayoutPreset(Format("25/50/25 on mon={}", mon), (*) => Layout_SetMonitorColumns(mon, [1, 2, 1]))
-}
-
-; Alt+Ctrl+Win+6: 20/60/20 vertikal
-^#!6:: {
-    mon := GetCurrentMonitorIndex()
-    ApplyLayoutPreset(Format("70/30 on mon={}", mon), (*) => Layout_SetMonitorColumns(mon, [1, 3, 1]))
-}
-
-; Alt+Ctrl+Win+7: 70/30 vertikal
-^#!7:: {
-    mon := GetCurrentMonitorIndex()
-    ApplyLayoutPreset(Format("70/30 on mon={}", mon), (*) => Layout_SetMonitorColumns(mon, [7, 3]))
-}
-
-; Alt+Ctrl+Win+0: alle Monitore 50/50
-^#!0:: {
-    ApplyLayoutPreset("50/50 on all monitors", ApplyPreset5050AllMonitors)
-}
+^#!1::LayoutPreset_Apply("1")   ; Vollbild (ein Leaf)
+^#!2::LayoutPreset_Apply("2")   ; 50/50
+^#!3::LayoutPreset_Apply("3")   ; 33/33/33
+^#!4::LayoutPreset_Apply("4")   ; 2x2 Quadranten
+^#!5::LayoutPreset_Apply("5")   ; 25/50/25
+^#!6::LayoutPreset_Apply("6")   ; 20/60/20
+^#!7::LayoutPreset_Apply("7")   ; 70/30
+^#!0::LayoutPreset_Apply("0")   ; alle Monitore 50/50
 
 #HotIf

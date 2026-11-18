@@ -45,7 +45,7 @@ Legend: `#` = Win, `!` = Alt, `^` = Ctrl, `+` = Shift
 - `#+Right` / `#+Left`: Expand across right/left neighbor (and reduce back)
 - `#^+Up` / `#^+Down`: Expand across up/down neighbor
 - `!Left` / `!Right` / `!Up` / `!Down`: Switch active snap area (focus top window)
-- `!Space`: Window search for the current snap area
+- `#Space`: Window search for the current snap area
 - `!Backspace` or `!Delete`: Remove current snap area
 - `!+o`: Briefly show all snap areas
 - `!+a`: Collect all windows into the active snap area
@@ -57,13 +57,14 @@ Legend: `#` = Win, `!` = Alt, `^` = Ctrl, `+` = Shift
 - `!+ArrowKeys`: Adjust boundary of the current split group
 - `^!h`: Toggle highlight overlay
 - `^!r`: Reload script
-- `^!/?`: Toggle hotkey overlay while held (vkBF)
+- `^!#` (vkBF, `/?` on US layouts): Toggle the hotkey overlay. Rows marked with `>` run the function directly (maximize/restore, split, collect, toggles, presets, ...): click them, or move the selection with `Up`/`Down` (`Left`/`Right` switches the column) and confirm with `Enter`; `Esc` closes
+- `^#!#` (vkBF): Toggle the layout overlay: shows the current layout of the active monitor with its area numbers plus a preview of every preset. While it is open, the bare preset key (`1`..`7`, `0`), a click on a tile, or arrow keys + `Enter` applies the preset; `Esc` closes
 - `^!w`: Toggle window pills overlay
 - `^!f`: Toggle focus mode (dims all windows except the active one and its popups; WinSnap overlays stay undimmed)
 - `^!z`: Toggle zen mode (same as focus mode, but inactive windows are hidden completely; pressing the other hotkey switches modes)
 - `^!b`: Open AutoSnap blacklist menu for the active window (process+class, class, title RegEx, class+title RegEx)
 - `^!p`: Pause/resume hotkeys and timers
-- `^!q`: Quit script
+- `^#!q`: Quit script
 
 ### Alt Mouse/Scroll Gestures
 
@@ -75,13 +76,18 @@ Legend: `#` = Win, `!` = Alt, `^` = Ctrl, `+` = Shift
 
 ### Layout Presets (per current monitor)
 
+Defined in `modules/WinSnap_LayoutPresets.ahk`; preview them with `^#!#` (layout overlay).
+
 - `^#!1`: Fullscreen (single leaf)
 - `^#!2`: 50/50 vertical split
 - `^#!3`: 33/33/33 vertical split
 - `^#!4`: 2x2 quadrants
 - `^#!5`: 25/50/25 vertical split
-- `^#!6`: 70/30 vertical split
+- `^#!6`: 20/60/20 vertical split
+- `^#!7`: 70/30 vertical split
 - `^#!0`: Set all monitors to 50/50
+
+Each monitor remembers which window sat in which area per preset: switching from preset A to B stores A's window assignment, and applying A again restores it (windows are matched by handle, falling back to process/class/title after a restart). Adjusting split boundaries keeps the preset identity; splitting or deleting an area turns the layout into a free layout without preset memory. Assignments persist in `WinSnap_PresetAssignments.json`, the active preset per monitor in `WinSnap_layouts.json`.
 
 ## Configuration
 

@@ -29,6 +29,12 @@ App_Startup() {
         LogException(e, "App_Startup: PillBlackList_Load failed")
     }
     try {
+        PresetMemory_Load()
+    }
+    catch Error as e {
+        LogException(e, "App_Startup: PresetMemory_Load failed")
+    }
+    try {
         OnExit(App_OnExit)
     }
     catch Error as e {
@@ -141,6 +147,12 @@ TogglePause() {
         }
         catch Error as e {
             LogError("TogglePause: HotkeyOverlay_Hide failed")
+        }
+        try {
+            LayoutOverlay_Hide()
+        }
+        catch Error as e {
+            LogError("TogglePause: LayoutOverlay_Hide failed")
         }
         try {
             HideHighlight()
