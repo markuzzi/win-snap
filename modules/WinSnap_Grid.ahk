@@ -899,8 +899,8 @@ ExpandedWindows_Forget(hwnd) {
 ; Vergisst alle pro-Fenster-Zustaende eines geschlossenen Fensters. Windows
 ; recycelt HWNDs, sonst erbt ein neues Fenster fremde Restore-Positionen.
 Window_ForgetState(hwnd) {
-    global WinHistory, LastDir, ExpandedWindows, MaximizeRestoreState, MonitorsDisplaced
-    for m in [WinHistory, LastDir, ExpandedWindows, MaximizeRestoreState, MonitorsDisplaced] {
+    global WinHistory, LastDir, ExpandedWindows, MaximizeRestoreState, MonitorsDisplaced, MonitorsPendingOrphans
+    for m in [WinHistory, LastDir, ExpandedWindows, MaximizeRestoreState, MonitorsDisplaced, MonitorsPendingOrphans] {
         try {
             if (m.Has(hwnd))
                 m.Delete(hwnd)

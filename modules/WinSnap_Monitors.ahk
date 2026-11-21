@@ -20,7 +20,7 @@
 ;   die verbleibenden Areas einsortiert: beim Wake/Dock-Wechsel kommt der
 ;   Monitor meist innerhalb weniger Sekunden zurueck.
 
-global Monitors := { list: [], byKey: Map(), byHandle: Map(), count: 0, sig: "" }
+global Monitors := { list: [], byKey: Map(), byHandle: Map(), count: 0, sysCount: 0, sig: "" }
 global MonitorsOffline := Map()      ; key -> Layout-Objekt nicht angeschlossener Monitore
 global MonitorsDisplaced := Map()    ; hwnd -> {key, leaf} Fenster, deren Monitor verschwunden ist
 global MonitorsKeyAlias := Map()     ; Fallback-Key (Adapter|physische Aufloesung) -> zuletzt gesehene Device-ID
@@ -226,15 +226,25 @@ Monitors_Signature(list) {
 ; angestossen und die bisherige Registry zurueckgegeben.
 Monitors_Refresh(force := false) {
     global Monitors, MonitorsApplyBusy
+    static lastCountCheck := 0
     if (!force) {
         if (!Monitors.list.Length)
             force := true
         else {
-            if (!MonitorsApplyBusy && Monitors.count != MonitorGetCount())
-                Monitors_ScheduleChange("monitor count changed", false)
+            ; Wird aus dem 150-ms-Ticker mehrfach pro Tick aufgerufen: die
+            ; Systemabfrage hoechstens alle 250 ms. Verglichen wird mit der
+            ; Systemanzahl zum Zeitpunkt des letzten Aufbaus, nicht mit der
+            ; Listenlaenge, sonst wuerde ein nicht abfragbarer Monitor den
+            ; Handler endlos neu anstossen.
+            if (!MonitorsApplyBusy && A_TickCount - lastCountCheck > 250) {
+                lastCountCheck := A_TickCount
+                if (Monitors.sysCount != MonitorGetCount())
+                    Monitors_ScheduleChange("monitor count changed", false)
+            }
             return Monitors
         }
     }
+    lastCountCheck := A_TickCount
     list := Monitors_Enumerate()
     byKey := Map()
     byHandle := Map()
@@ -249,6 +259,7 @@ Monitors_Refresh(force := false) {
     Monitors.byKey := byKey
     Monitors.byHandle := byHandle
     Monitors.count := list.Length
+    Monitors.sysCount := MonitorGetCount()
     Monitors.sig := Monitors_Signature(list)
     return Monitors
 }
@@ -448,6 +459,10 @@ Monitors_ApplyPendingChange(*) {
         MonitorsChangeQueued := true
         return
     }
+    ; Waehrend der Umschluesselung sind Layouts/WinToLeaf kurz inkonsistent:
+    ; Hotkeys, Shell-Hook und Timer so lange puffern. Nachrichten (z.B. ein
+    ; weiteres WM_DISPLAYCHANGE) werden danach zugestellt und neu geplant.
+    Critical "On"
     ; Device-IDs fehlen direkt nach dem Umschalten oft noch: kurz warten, statt
     ; ueber einen Fallback-Key ein fremdes Layout zu laden.
     if (MonitorsKeyRetries < MonitorsKeyRetryMax && Monitors_EnumerationHasWeakKeys()) {
@@ -476,6 +491,7 @@ Monitors_ApplyPendingChange(*) {
         LogInfo("Monitors_ApplyPendingChange: display changed again during apply -> re-run")
         try {
             SetTimer(Monitors_ApplyPendingChange, -MonitorsChangeDelayMs)
+            Critical "Off"
             return
         }
         catch Error as e {
@@ -483,6 +499,7 @@ Monitors_ApplyPendingChange(*) {
         }
     }
     StateSet("DisplayChangePending", false)
+    Critical "Off"
 }
 
 ; Schluesselt alle index-basierten Zustaende auf die neue Monitor-Konfiguration um.
@@ -725,6 +742,7 @@ Monitors_ReassignOrphans(*) {
         try SetTimer(Monitors_ReassignOrphans, -MonitorsOrphanGraceMs)
         return
     }
+    Critical "On"
     hwnds := []
     for hwnd in MonitorsPendingOrphans
         hwnds.Push(hwnd)
@@ -759,4 +777,5 @@ Monitors_ReassignOrphans(*) {
         try WindowPills_Invalidate()
         SnappedWindows_ScheduleWrite()
     }
+    Critical "Off"
 }
