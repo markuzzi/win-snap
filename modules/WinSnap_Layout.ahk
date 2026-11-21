@@ -390,7 +390,8 @@ Layout_FindAxisSplitBetweenLeaves(mon, leafA, leafB, axis) {
 }
 
 ; Wendet die aktuellen Rechtecke auf alle Fenster des Teilbaums erneut an.
-ReapplySubtree(mon, nodeId) {
+; skip: optionale Map hwnd -> true fuer Fenster, die bereits korrekt liegen.
+ReapplySubtree(mon, nodeId, skip := 0) {
     global WinToLeaf, Layouts
     wasSuppressed := StateGet("SuppressMoveHighlight", false)
     StateSet("SuppressMoveHighlight", true)
@@ -399,6 +400,8 @@ ReapplySubtree(mon, nodeId) {
     for id in leaves
         set[id] := true
     for hwnd, info in WinToLeaf {
+        if (skip && skip.Has(hwnd))
+            continue
         if (info.mon = mon) && set.Has(info.leaf) {
             r := GetLeafRect(mon, info.leaf)
             MoveWindow(hwnd, r.L, r.T, r.R - r.L, r.B - r.T)
@@ -512,19 +515,26 @@ Layout_LoadAll() {
     }
 
     if (data is Map && data.Has("monitors") && (data["monitors"] is Map)) {
-        ; Format v2: nach stabilem Monitor-Key
+        ; Format v2: nach stabilem Monitor-Key. Gelernte Aliase (Fallback-Key ->
+        ; Device-ID) zuerst uebernehmen, dann die Registry damit neu aufbauen.
+        if (data.Has("aliases") && (data["aliases"] is Map)) {
+            Monitors_SetAliases(data["aliases"])
+            Monitors_Refresh(true)
+        }
+        ; Erst alles parken, dann je angeschlossenem Monitor uebernehmen (stabiler
+        ; Key vor Fallback-Key, damit alte Fallback-Eintraege nicht gewinnen).
         for key, layoutMap in data["monitors"] {
             if (!(layoutMap is Map))
                 continue
-            layout := Layout_DeserializeMonitor(layoutMap)
-            monIdx := Monitors_IndexFromKey(key)
-            if (monIdx) {
-                Layouts[monIdx] := layout
-            } else {
-                MonitorsOffline[key] := layout
-                LogInfo(Format("Layout_LoadAll: monitor [{}] not connected -> layout parked", key))
-            }
+            MonitorsOffline[key] := Layout_DeserializeMonitor(layoutMap)
         }
+        for m in Monitors_Refresh().list {
+            layout := Monitors_TakeOfflineLayout(m)
+            if (layout)
+                Layouts[m.index] := layout
+        }
+        for key, layout in MonitorsOffline
+            LogInfo(Format("Layout_LoadAll: monitor [{}] not connected -> layout parked", key))
     } else if (data is Map) {
         ; Altes Format: Top-Level-Keys sind Monitorindizes der damaligen Sitzung
         for mon, layoutMap in data {
@@ -565,7 +575,7 @@ Layout_LoadAll() {
 
 ; Serialisiert die Layouts in eine Map-Struktur fuer JSON (Format v2, nach Monitor-Key).
 Layout_SerializeAll() {
-    global Layouts, MonitorsOffline
+    global Layouts, MonitorsOffline, MonitorsKeyAlias
     monMap := Map()
     for mon, layout in Layouts {
         layoutMap := Layout_SerializeMonitor(layout)
@@ -578,17 +588,25 @@ Layout_SerializeAll() {
         layoutMap["index"] := mon
         monMap[key] := layoutMap
     }
-    ; Nicht angeschlossene Monitore mitschreiben, damit ihr Layout erhalten bleibt
+    ; Nicht angeschlossene Monitore mitschreiben, damit ihr Layout erhalten bleibt.
+    ; Geparkte Layouts unter einem Fallback-Key, der inzwischen einer Device-ID
+    ; zugeordnet ist, sind Altlasten und werden nicht mehr mitgeschrieben.
     for key, layout in MonitorsOffline {
         if (monMap.Has(key))
+            continue
+        if (MonitorsKeyAlias.Has(key) && (monMap.Has(MonitorsKeyAlias[key]) || MonitorsOffline.Has(MonitorsKeyAlias[key])))
             continue
         layoutMap := Layout_SerializeMonitor(layout)
         if (layoutMap)
             monMap[key] := layoutMap
     }
+    aliases := Map()
+    for fallback, id in MonitorsKeyAlias
+        aliases[fallback] := id
     data := Map()
     data["version"] := 2
     data["monitors"] := monMap
+    data["aliases"] := aliases
     return data
 }
 
@@ -1295,6 +1313,11 @@ AutoSnap_ProcessWindow(hwnd, target) {
         }
         return false
     }
+
+    ; Fenster eines gerade abgesteckten Monitors: in der Karenzzeit nicht in die
+    ; aktive Area ziehen, der Monitor-Handler sortiert es ein oder holt es zurueck.
+    if (Monitors_IsOrphanPending(hwnd))
+        return false
 
     ; Noch keinem Leaf zugeordnet -> in die aktive SnapArea einsortieren.
     if (!target)

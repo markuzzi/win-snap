@@ -104,11 +104,12 @@ Adjust these to taste and reload the script (`^!r`).
 
 ## Multi-Monitor Behaviour
 
-AutoHotkey addresses monitors by a volatile index (1..N). WinSnap therefore maps each monitor to a stable key (the display device interface ID, falling back to device name + resolution) in `modules/WinSnap_Monitors.ahk`.
+AutoHotkey addresses monitors by a volatile index (1..N). WinSnap therefore maps each monitor to a stable key (the display device interface ID, falling back to adapter name + physical resolution) in `modules/WinSnap_Monitors.ahk`.
 
-- Layouts are persisted per stable key (file format v2: `{"version": 2, "monitors": {"<key>": {...}}}`). Old index-based files are migrated on first load.
-- On `WM_DISPLAYCHANGE` / work-area changes (debounced ~700 ms) all index-based state (layouts, window↔area mapping, selection, pill reserves, frame caches) is re-keyed to the new indices.
-- Layouts of unplugged monitors are parked in memory and in the layout file; they are restored when the monitor returns. Windows that were on the unplugged monitor are assigned to the snap area Windows moved them into, and moved back to their old area when the monitor reappears.
+- Layouts are persisted per stable key (file format v2: `{"version": 2, "monitors": {"<key>": {...}}, "aliases": {...}}`). Old index-based files are migrated on first load.
+- Right after a hotplug or a wake from sleep, Windows often does not report the device interface ID yet. WinSnap then waits (up to 3 × 1 s) before applying the change, and otherwise resolves the monitor through a learned alias (`aliases`: fallback key → last known device ID) so that the correct layout is restored instead of a fresh one.
+- On `WM_DISPLAYCHANGE` / work-area changes (debounced ~700 ms) all index-based state (layouts, window↔area mapping, selection, pill reserves, frame caches) is re-keyed to the new indices. The monitor registry is only rebuilt inside this handler; a change detected elsewhere just schedules it. Changes arriving while the handler runs are applied in a second pass.
+- Layouts of unplugged monitors are parked in memory and in the layout file; they are restored when the monitor returns. Windows that were on the unplugged monitor wait 5 s (grace period) before they are assigned to the snap area Windows moved them into; if the monitor comes back earlier (typical for wake/dock), they move straight back to their old area.
 - Monitor lookup for windows and points uses `MonitorFromWindow` / `MonitorFromPoint`, so windows overlapping the taskbar or partially off-screen resolve to the correct monitor.
 
 ## Persistence and Logs
